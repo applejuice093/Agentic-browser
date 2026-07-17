@@ -186,15 +186,27 @@ class Browser:
         *,
         detail: str = "normal",
         max_tokens: int = 2000,
+        settle: bool = True,
+        settle_budget_ms: float = 8_000,
     ) -> Any:
         """
         Open a page (optional URL) and return an AgentSession for LLM tool use.
+
+        When ``settle`` is True (default), runs overlay dismiss + SPA settle
+        so the first observation is product content, not a cookie wall.
         """
         if url:
             page = await self.open(url)
         else:
             page = await self.new_page()
-        return page.as_agent(detail=detail, max_tokens=max_tokens)
+        agent = page.as_agent(
+            detail=detail,
+            max_tokens=max_tokens,
+            settle_budget_ms=settle_budget_ms,
+        )
+        if settle and url:
+            await agent.prepare(force=True, scroll_probe=True)
+        return agent
 
     async def __aenter__(self) -> Self:
         return await self.start()

@@ -1088,6 +1088,10 @@ class Page:
         detail: str = "normal",
         max_tokens: int = 2000,
         observe_after_action: bool = True,
+        auto_settle: bool = True,
+        auto_dismiss_overlays: bool = True,
+        settle_budget_ms: float = 8_000,
+        recover_stale: bool = True,
     ) -> Any:
         """
         Return an :class:`~agent_browser.agent.AgentSession` bound to this page.
@@ -1101,6 +1105,10 @@ class Page:
             default_detail=detail,
             max_tokens=max_tokens,
             observe_after_action=observe_after_action,
+            auto_settle=auto_settle,
+            auto_dismiss_overlays=auto_dismiss_overlays,
+            settle_budget_ms=settle_budget_ms,
+            recover_stale=recover_stale,
         )
 
     async def observe(

@@ -145,6 +145,14 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "name": "browser_prepare",
+        "description": (
+            "Settle SPA (domcontentloaded/networkidle budget), dismiss cookie/consent "
+            "overlays, optional scroll probe. Call after heavy navigations if observe looks empty."
+        ),
+        "parameters": {"type": "object", "properties": {}},
+    },
 ]
 
 

@@ -45,7 +45,7 @@ from agent_browser.scrape import scrape_page, scrape_url, snapshot_to_scrape_res
 from agent_browser.semantic import SemanticDOMEngine, StableIDAssigner
 from agent_browser.vision import OCREngine, UIDetector, VisionDependencyError, VisionEngine
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 __all__ = [
     "Browser",

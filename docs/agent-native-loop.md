@@ -1,10 +1,23 @@
-# Agent-native observation loop (v0.3)
+# Agent-native observation loop (v0.3.1)
 
-**Branch:** `feature/agent-native-loop`
+**Branch:** `feature/agent-native-loop` · merged into `dev`
 
 ## Why
 
 LLM agents need **cheap, stable, actionable** observations — not full HTML or fat DOM dumps.
+Marketing SPAs also need **overlay dismissal** and **settled hydration** before the first look.
+
+## Systems (bottleneck workarounds)
+
+| Bottleneck | System |
+|------------|--------|
+| Cookie / CMP / privacy walls | `overlays.dismiss_overlays` (selectors + role + JS + hide fallback) |
+| SPA hang on `networkidle` | `settle.settle_page` budgeted wait (domcontentloaded → capped networkidle) |
+| Lazy content below fold | optional scroll probe during prepare |
+| Noisy CMP headings | `is_noise_text` filter in compact observation |
+| Fat HTML / fat trees | token-budgeted `build_observation` + `summary` field |
+| Stale refs after re-render | auto resync + optional `text_hint` re-find on click/type |
+| Analytics spam in network | filter sentry/gtm/onetrust from observation network hints |
 
 ## API
 
@@ -12,21 +25,18 @@ LLM agents need **cheap, stable, actionable** observations — not full HTML or 
 from agent_browser import Browser, tools_as_openai
 
 async with Browser() as browser:
-    agent = await browser.open_agent("https://example.com")
+    # prepare() runs automatically: settle + dismiss cookies
+    agent = await browser.open_agent("https://www.rockstargames.com/VI")
 
-    obs = await agent.observe(detail="normal", max_tokens=2000)
-    # obs.interactive[].ref  →  click/type targets
+    obs = await agent.observe(max_tokens=2000)
+    print(obs.summary)           # high-signal one-liner
+    print(obs.interactive[0])  # {ref, role, text, href, ...}
 
-    result = await agent.click(obs.interactive[0].ref)
-    # result.ok, result.error_code, result.observation
+    result = await agent.click(ref, text_hint="Pre-Order")  # recovery hint
+    await agent.resync()  # nuclear option
 
-    await agent.type(ref, "query", clear=True, submit=True)
-    await agent.wait("api", value="/api/", timeout_ms=10000)
-    await agent.resync()  # if refs look stale
-
-    # LLM tool-calling
-    await agent.call_tool("browser_click", {"ref": 12})
-    tools = tools_as_openai()  # bind to your model
+    tools = tools_as_openai()
+    await agent.call_tool("browser_prepare", {})
 ```
 
 ### Detail levels
@@ -34,7 +44,7 @@ async with Browser() as browser:
 | Level | Contents |
 |-------|----------|
 | `sparse` | Interactive only, short text, tiny |
-| `normal` | Interactive + headings + network hints + diff |
+| `normal` | Interactive + clean headings + network hints + diff + summary |
 | `full` | Large (debug); prefer resync rarely |
 
 ### Error codes
@@ -43,11 +53,14 @@ async with Browser() as browser:
 
 ### Tools
 
-`browser_navigate`, `browser_observe`, `browser_click`, `browser_type`, `browser_wait`, `browser_find`, `browser_network`, `browser_resync`
+`browser_navigate`, `browser_observe`, `browser_click`, `browser_type`, `browser_wait`, `browser_find`, `browser_network`, `browser_resync`, `browser_prepare`
 
 ## Files
 
 - `agent/session.py` — AgentSession  
+- `agent/overlays.py` — consent / modal dismiss  
+- `agent/settle.py` — budgeted SPA settle  
+- `agent/recovery.py` — stale-ref helpers  
 - `agent/tools.py` — tool schemas  
 - `observation/compact.py` — token-budgeted builder  
 - `models/observation.py` — Observation / ActionResult / ErrorCode  

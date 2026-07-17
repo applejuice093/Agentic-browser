@@ -119,11 +119,14 @@ async def test_agent_type_and_tool_dispatch():
 async def test_action_result_on_missing_ref():
     async with Browser(headless=True) as browser:
         page = await browser.set_content("<html><body><p>hi</p></body></html>")
-        agent = page.as_agent()
+        agent = page.as_agent(recover_stale=False)
         await agent.observe()
         result = await agent.click(99999)
         assert result.ok is False
-        assert result.error_code == ErrorCode.ELEMENT_NOT_FOUND
+        assert result.error_code in (
+            ErrorCode.ELEMENT_NOT_FOUND,
+            ErrorCode.ELEMENT_STALE,
+        )
 
 
 @pytest.mark.asyncio

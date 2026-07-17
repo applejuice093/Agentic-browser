@@ -113,6 +113,9 @@ class Observation(BaseModel):
     approx_tokens: int = 0
     step: int = 0
     note: str | None = None
+    # High-signal summary for marketing/SPA landings
+    summary: str | None = None
+    meta: dict[str, Any] = Field(default_factory=dict)
 
     def to_llm_dict(self) -> dict[str, Any]:
         """Drop nulls / empty fields for cheaper prompts."""
@@ -135,6 +138,8 @@ class Observation(BaseModel):
             data.pop("alerts", None)
         if not data.get("headings"):
             data.pop("headings", None)
+        if not data.get("meta"):
+            data.pop("meta", None)
         return data
 
 

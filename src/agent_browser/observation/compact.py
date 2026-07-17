@@ -16,6 +16,14 @@ from agent_browser.models.observation import (
 )
 from agent_browser.models.snapshot import Snapshot
 
+try:
+    from agent_browser.agent.overlays import is_noise_text
+except Exception:  # pragma: no cover
+
+    def is_noise_text(text: str | None) -> bool:  # type: ignore[misc]
+        return False
+
+
 INTERACTIVE_ROLES = frozenset(
     {
         "button",
@@ -108,21 +116,47 @@ def is_landmark(el: Element) -> bool:
     return (el.role or "").lower() in LANDMARK_ROLES
 
 
+def _clean_interactive(el: Element) -> bool:
+    """Drop cookie/CMP noise from interactive list."""
+    blob = " ".join(
+        x
+        for x in (
+            el.text or "",
+            el.name or "",
+            el.attributes.get("aria-label") or "",
+            el.attributes.get("id") or "",
+            el.attributes.get("class") or "",
+        )
+        if x
+    )
+    if is_noise_text(blob):
+        # keep only explicit accept/reject if short
+        t = (el.text or el.name or "").strip().lower()
+        if t in {"accept all", "reject all", "accept", "close", "agree"}:
+            return True
+        return False
+    return True
+
+
 def select_elements(
     elements: list[Element],
     detail: DetailLevel,
 ) -> tuple[list[Element], list[Element], bool]:
     """Return (interactive, headings, truncated_flag_hint)."""
-    interactive = [e for e in elements if e.visible and is_interactive(e)]
-    headings = [e for e in elements if e.visible and is_heading(e)]
+    interactive = [
+        e for e in elements if e.visible and is_interactive(e) and _clean_interactive(e)
+    ]
+    headings = [
+        e
+        for e in elements
+        if e.visible and is_heading(e) and not is_noise_text(e.text) and not is_noise_text(e.name)
+    ]
     if detail == DetailLevel.SPARSE:
-        # prefer enabled controls; cap later by tokens
         interactive = [e for e in interactive if e.enabled or e.role in ("link", "button")]
         headings = headings[:6]
     elif detail == DetailLevel.NORMAL:
-        # add landmarks as non-interactive context via headings list? keep separate
         pass
-    else:  # FULL — interactive still filtered; caller may dump all
+    else:
         pass
     return interactive, headings, False
 
@@ -169,6 +203,48 @@ def network_to_hints(
     return hints
 
 
+def _build_summary(
+    snapshot: Snapshot,
+    headings: list[InteractiveRef],
+    interactive: list[InteractiveRef],
+) -> str:
+    parts: list[str] = []
+    if snapshot.title:
+        parts.append(snapshot.title)
+    for h in headings[:5]:
+        if h.text:
+            parts.append(h.text)
+    # CTAs
+    ctas = []
+    for r in interactive:
+        t = (r.text or r.name or "").strip()
+        if not t:
+            continue
+        low = t.lower()
+        if any(
+            k in low
+            for k in (
+                "pre-order",
+                "preorder",
+                "buy",
+                "watch",
+                "trailer",
+                "play",
+                "download",
+                "sign in",
+                "log in",
+                "subscribe",
+            )
+        ):
+            ctas.append(t[:60])
+        if len(ctas) >= 4:
+            break
+    if ctas:
+        parts.append("CTAs: " + "; ".join(ctas))
+    summary = " | ".join(parts)
+    return summary[:400] if summary else snapshot.url
+
+
 def build_observation(
     snapshot: Snapshot,
     *,
@@ -182,25 +258,39 @@ def build_observation(
     step: int = 0,
     note: str | None = None,
     errors: list[str] | None = None,
+    meta: dict[str, Any] | None = None,
 ) -> Observation:
     """
     Compress a Snapshot into an LLM-friendly Observation under ``max_tokens``.
     """
     if detail == DetailLevel.FULL:
-        interactive_els = [e for e in snapshot.elements if e.visible]
-        heading_els: list[Element] = []
+        interactive_els = [
+            e for e in snapshot.elements if e.visible and _clean_interactive(e)
+        ]
+        heading_els = [
+            e
+            for e in snapshot.elements
+            if e.visible and is_heading(e) and not is_noise_text(e.text)
+        ]
     else:
         interactive_els, heading_els, _ = select_elements(snapshot.elements, detail)
 
     # Prefer interactive, enabled, shorter names first for ranking
     def rank(e: Element) -> tuple:
         role = (e.role or "").lower()
+        text = (e.text or e.name or "").lower()
         prio = 0
         if role in ("button", "link", "textbox", "searchbox"):
             prio = 3
         elif is_interactive(e):
             prio = 2
-        return (-prio, 0 if e.enabled else 1, e.id)
+        # boost primary CTAs
+        if any(k in text for k in ("pre-order", "buy", "trailer", "watch", "sign in", "log in")):
+            prio += 2
+        # demote social chrome slightly
+        if any(k in text for k in ("instagram", "tiktok", "facebook", "youtube", "twitter", "x.com")):
+            prio -= 1
+        return (-prio, 0 if e.enabled else 1, len(text), e.id)
 
     interactive_els = sorted(interactive_els, key=rank)
     heading_els = heading_els[:max_headings]
@@ -220,6 +310,25 @@ def build_observation(
         element_to_ref(e, include_box=False, text_limit=text_limit) for e in heading_els
     ]
 
+    # Filter network noise (sentry/analytics) for cleaner agent view
+    filtered_net = [
+        r
+        for r in (network or [])
+        if not any(
+            x in r.url.lower()
+            for x in (
+                "sentry.io",
+                "google-analytics",
+                "googletagmanager",
+                "facebook.com/tr",
+                "hotjar",
+                "cookielaw.org",
+                "onetrust",
+            )
+        )
+    ]
+
+    summary = _build_summary(snapshot, headings, refs)
     obs = Observation(
         url=snapshot.url,
         title=snapshot.title,
@@ -227,7 +336,7 @@ def build_observation(
         interactive=refs,
         headings=headings if detail != DetailLevel.SPARSE else headings[:4],
         diff=diff_to_summary(diff),
-        network=network_to_hints(network or []),
+        network=network_to_hints(filtered_net),
         errors=list(errors or []),
         alerts=list(snapshot.alerts),
         scroll_position=snapshot.scroll_position,
@@ -236,11 +345,12 @@ def build_observation(
         truncated=truncated,
         step=step,
         note=note,
+        summary=summary,
+        meta=dict(meta or {}),
     )
 
     # Token budget: drop tails until under max
-    data = obs.to_llm_dict()
-    tokens = _approx_tokens(data)
+    tokens = _approx_tokens(obs.to_llm_dict())
     while tokens > max_tokens and len(obs.interactive) > 8:
         obs.interactive = obs.interactive[:-5]
         obs.truncated = True
@@ -253,4 +363,6 @@ def build_observation(
         obs.network = obs.network[:3]
         tokens = _approx_tokens(obs.to_llm_dict())
     obs.approx_tokens = tokens
+    # refresh summary after truncation
+    obs.summary = _build_summary(snapshot, obs.headings, obs.interactive)
     return obs

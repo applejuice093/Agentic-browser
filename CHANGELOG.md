@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.1 — Production agent systems (overlays, settle, recovery)
+
+### Added
+
+- **Overlay dismisser** — OneTrust/Cookiebot/role/JS + hide fallback
+- **Budgeted SPA settle** — no infinite networkidle hangs
+- **Noise filtering** — strip CMP/privacy headings from observations
+- **Observation.summary** — one-line high-signal page summary for LLMs
+- **Stale-ref recovery** — resync + optional text_hint on click/type
+- **scroll_into_view** before click; analytics noise filtered from network hints
+- Tool: `browser_prepare`
+
 ## 0.3.0 — Agent-native observation loop
 
 ### Added
