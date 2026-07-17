@@ -349,12 +349,6 @@ ruff check src tests
 
 ---
 
-## Ethics
-
-- Use only on sites and accounts you’re allowed to automate.  
-- **No captcha/JS-challenge bypass** — we detect and report gates.  
-- Respect robots.txt / ToS / rate limits for your use case.  
-- Prefer `AGENT_BROWSER_ALLOWED_HOSTS` in shared demos.
 
 ---
 
