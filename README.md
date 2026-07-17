@@ -112,11 +112,11 @@ from agent_browser import Browser
 async def main():
     async with Browser(headless=True) as browser:
         page = await browser.open("https://example.com")
-        snap = await page.snapshot()
+        snap = await page.snapshot()  # semantic roles, stable ids, tree links
         print(snap.url, snap.title, len(snap.elements))
-        # Click by CSS selector or by stable id from snapshot:
-        # await page.click("a")
-        # await page.click(snap.elements[0].id)
+        # Semantic find (M2):
+        # btn = await page.find(role="button", text_contains="More")
+        # await page.click(btn.id)
         # Offline fixture (no network):
         # page = await browser.set_content("<button id='go'>Go</button>")
 

@@ -18,6 +18,7 @@ from agent_browser.models.element import BoundingBox, Element
 from agent_browser.models.events import BrowserEvent
 from agent_browser.models.snapshot import Snapshot
 from agent_browser.page import Page
+from agent_browser.semantic import SemanticDOMEngine, StableIDAssigner
 
 __version__ = "0.1.0"
 
@@ -29,6 +30,8 @@ __all__ = [
     "Snapshot",
     "BrowserEvent",
     "BrowserConfig",
+    "SemanticDOMEngine",
+    "StableIDAssigner",
     "AgentBrowserError",
     "BrowserNotStartedError",
     "ElementNotFoundError",

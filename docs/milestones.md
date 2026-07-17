@@ -26,9 +26,9 @@ Each milestone has a **git branch**. Work on the branch for the active milestone
 - [x] Basic tests without network flakiness where possible
 
 ### M2 — Semantic model
-- [ ] Role/name extraction + stable IDs across updates
-- [ ] `snapshot()` JSON matches design schema
-- [ ] Layout noise filtered from tree
+- [x] Role/name extraction + stable IDs across updates
+- [x] `snapshot()` JSON matches design schema
+- [x] Layout noise filtered from tree
 
 ### M3 — Diffs & events
 - [ ] `Diff` between snapshots
