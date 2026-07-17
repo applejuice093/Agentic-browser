@@ -22,6 +22,9 @@ from agent_browser.models.element import Element
 from agent_browser.models.events import BrowserEvent, EventType
 from agent_browser.models.snapshot import Snapshot
 from agent_browser.models.vision import OCRRegion, VisionDetection, VisionResult
+from agent_browser.memory.store import MemoryStore
+from agent_browser.planning.context import ContextBuilder
+from agent_browser.planning.planner import Planner
 from agent_browser.semantic.engine import SemanticDOMEngine
 from agent_browser.vision.engine import VisionEngine
 
@@ -42,6 +45,7 @@ class Page:
     M3: incremental ``diff``, event bus, MutationObserver ``watch``.
     M4: OCR / vision (``get_text_in_screenshot``, ``detect_ui``).
     M6: ``get_by_role`` / ``get_by_label`` accessibility finders.
+    M7: session memory, ``context()``, ``plan(goal)``.
     """
 
     def __init__(
@@ -50,6 +54,7 @@ class Page:
         *,
         config: BrowserConfig,
         on_close: Callable[[Page], None] | None = None,
+        memory: MemoryStore | None = None,
     ) -> None:
         self._page = pw_page
         self.config = config
@@ -60,6 +65,9 @@ class Page:
         self._events = EventBus()
         self._diff_engine = DiffEngine()
         self._vision = VisionEngine()
+        self._memory = memory or MemoryStore()
+        self._context_builder = ContextBuilder()
+        self._planner = Planner()
         self._last_snapshot: Snapshot | None = None
         self._last_diff: Diff | None = None
         self._last_vision: VisionResult | None = None
@@ -117,6 +125,11 @@ class Page:
         """Result of the most recent vision pass."""
         return self._last_vision
 
+    @property
+    def memory(self) -> MemoryStore:
+        """Session memory store (M7)."""
+        return self._memory
+
     # --- navigation ---
 
     async def open(self, url: str, *, wait_until: WaitUntil = "domcontentloaded") -> None:
@@ -141,6 +154,8 @@ class Page:
                 via="goto",
             )
         )
+        self._memory.log_url(self._page.url)
+        self._memory.log_action({"type": "goto", "url": self._page.url})
         if self._watch_enabled:
             await self._reattach_mutation_observer()
 
@@ -250,6 +265,7 @@ class Page:
                 target=self._target_meta(target),
             )
         )
+        self._memory.log_action({"type": "click", "target": self._target_meta(target)})
 
     async def type(
         self,
@@ -289,6 +305,9 @@ class Page:
                 length=len(text),
             )
         )
+        self._memory.log_action(
+            {"type": "type", "target": self._target_meta(target), "length": len(text)}
+        )
 
     async def fill(
         self,
@@ -312,6 +331,14 @@ class Page:
                 target=self._target_meta(target),
                 length=len(text),
             )
+        )
+        self._memory.log_action(
+            {
+                "type": "fill",
+                "target": self._target_meta(target),
+                "length": len(text),
+                "value": text,
+            }
         )
 
     async def press(
@@ -783,6 +810,51 @@ class Page:
             image_bytes=image_bytes,
         )
         return self._vision.ocr.join_text(regions, separator=separator)
+
+    # --- memory / planning (M7) ---
+
+    async def context(
+        self,
+        *,
+        max_tokens: int = 1000,
+        goal: str | None = None,
+        refresh: bool = True,
+        include_memory: bool = True,
+    ) -> dict[str, Any]:
+        """
+        LLM-oriented compressed page context.
+
+        Ranks interactive elements and fits them into an approximate token budget.
+        """
+        if refresh or self._last_snapshot is None:
+            await self.snapshot()
+        assert self._last_snapshot is not None
+        mem = self._memory.memory_summary() if include_memory else None
+        return self._context_builder.build(
+            self._last_snapshot,
+            max_tokens=max_tokens,
+            goal=goal,
+            memory=mem,
+        )
+
+    async def plan(
+        self,
+        goal: str,
+        *,
+        refresh: bool = True,
+        structured: bool = False,
+    ) -> list[str] | dict[str, Any]:
+        """Rule-based plan / action suggestions for ``goal``."""
+        if refresh or self._last_snapshot is None:
+            await self.snapshot()
+        assert self._last_snapshot is not None
+        self._memory.set("current_goal", goal)
+        if structured:
+            return self._planner.plan_structured(self._last_snapshot, goal)
+        return self._planner.plan(self._last_snapshot, goal)
+
+    def memory_summary(self) -> dict[str, Any]:
+        return self._memory.memory_summary()
 
     async def detect_ui(
         self,

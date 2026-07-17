@@ -5,8 +5,11 @@ from __future__ import annotations
 from types import TracebackType
 from typing import Any, Self
 
+import uuid
+
 from agent_browser.config import BrowserConfig
 from agent_browser.exceptions import BrowserNotStartedError, NavigationError
+from agent_browser.memory.store import MemoryStore
 from agent_browser.page import Page
 
 
@@ -16,6 +19,7 @@ class Browser:
 
     M1: wraps Playwright (Chromium / Firefox / WebKit), creates pages,
     and supports ``open(url)`` plus async context-manager lifecycle.
+    M7: shared session :class:`MemoryStore`.
     """
 
     def __init__(
@@ -23,6 +27,8 @@ class Browser:
         *,
         headless: bool | None = None,
         config: BrowserConfig | None = None,
+        session_id: str | None = None,
+        memory: MemoryStore | None = None,
         **overrides: object,
     ) -> None:
         self.config = (config or BrowserConfig()).model_copy(deep=True)
@@ -32,6 +38,8 @@ class Browser:
             if hasattr(self.config, key):
                 setattr(self.config, key, value)
 
+        self.session_id = session_id or str(uuid.uuid4())
+        self.memory = memory or MemoryStore(self.session_id)
         self._playwright: Any = None
         self._browser: Any = None
         self._context: Any = None
@@ -124,7 +132,12 @@ class Browser:
         self._ensure_started()
         assert self._context is not None
         pw_page = await self._context.new_page()
-        page = Page(pw_page, config=self.config, on_close=self._forget_page)
+        page = Page(
+            pw_page,
+            config=self.config,
+            on_close=self._forget_page,
+            memory=self.memory,
+        )
         self._pages.append(page)
         return page
 

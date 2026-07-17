@@ -23,6 +23,8 @@ from agent_browser.models.snapshot import Snapshot
 from agent_browser.models.vision import OCRRegion, VisionDetection, VisionResult
 from agent_browser.page import Page
 from agent_browser.semantic import SemanticDOMEngine, StableIDAssigner
+from agent_browser.memory import MemoryStore
+from agent_browser.planning import ContextBuilder, Planner
 from agent_browser.vision import OCREngine, UIDetector, VisionDependencyError, VisionEngine
 
 __version__ = "0.1.0"
@@ -49,6 +51,9 @@ __all__ = [
     "VisionResult",
     "VisionDependencyError",
     "VisionError",
+    "MemoryStore",
+    "ContextBuilder",
+    "Planner",
     "AgentBrowserError",
     "BrowserNotStartedError",
     "ElementNotFoundError",

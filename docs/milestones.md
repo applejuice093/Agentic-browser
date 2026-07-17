@@ -50,9 +50,9 @@ Each milestone has a **git branch**. Work on the branch for the active milestone
 - [x] Robust AX merge
 
 ### M7 — Memory & planner
-- [ ] Session KV + action history
-- [ ] `context(max_tokens=...)`
-- [ ] Rule-based `plan(goal)`
+- [x] Session KV + action history
+- [x] `context(max_tokens=...)`
+- [x] Rule-based `plan(goal)`
 
 ### M8 — Anti-bot
 - [ ] Humanized delays / paths
