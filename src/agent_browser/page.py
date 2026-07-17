@@ -5,6 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal
 
+import asyncio
+import random
+
 from agent_browser.accessibility.queries import (
     Exactness,
     filter_by_label,
@@ -13,6 +16,7 @@ from agent_browser.accessibility.queries import (
     filter_by_test_id,
     filter_by_text,
 )
+from agent_browser.antibot.humanize import HumanizedInput, Point
 from agent_browser.events.bus import EventBus, EventHandler
 from agent_browser.events.diffing import DiffEngine
 from agent_browser.events.monitor import MutationMonitor
@@ -46,6 +50,7 @@ class Page:
     M4: OCR / vision (``get_text_in_screenshot``, ``detect_ui``).
     M6: ``get_by_role`` / ``get_by_label`` accessibility finders.
     M7: session memory, ``context()``, ``plan(goal)``.
+    M8: optional humanized mouse/keyboard input.
     """
 
     def __init__(
@@ -55,6 +60,7 @@ class Page:
         config: BrowserConfig,
         on_close: Callable[[Page], None] | None = None,
         memory: MemoryStore | None = None,
+        humanize: HumanizedInput | bool | None = None,
     ) -> None:
         self._page = pw_page
         self.config = config
@@ -68,6 +74,19 @@ class Page:
         self._memory = memory or MemoryStore()
         self._context_builder = ContextBuilder()
         self._planner = Planner()
+        if isinstance(humanize, HumanizedInput):
+            self._humanize = humanize
+        else:
+            enabled = (
+                bool(humanize)
+                if humanize is not None
+                else bool(getattr(config, "humanize", False))
+            )
+            self._humanize = HumanizedInput(
+                enabled=enabled,
+                min_delay_ms=getattr(config, "humanize_min_delay_ms", 30),
+                max_delay_ms=getattr(config, "humanize_max_delay_ms", 120),
+            )
         self._last_snapshot: Snapshot | None = None
         self._last_diff: Diff | None = None
         self._last_vision: VisionResult | None = None
@@ -75,6 +94,7 @@ class Page:
         self._auto_snapshot_on_mutation = True
         self._watch_enabled = False
         self._nav_from_url: str | None = None
+        self._mouse_pos = Point(0, 0)
 
         # Playwright navigation hook
         self._page.on("framenavigated", self._on_frame_navigated)
@@ -129,6 +149,14 @@ class Page:
     def memory(self) -> MemoryStore:
         """Session memory store (M7)."""
         return self._memory
+
+    @property
+    def humanize(self) -> HumanizedInput:
+        """Humanized input controller (M8)."""
+        return self._humanize
+
+    def set_humanize(self, enabled: bool) -> None:
+        self._humanize.enabled = enabled
 
     # --- navigation ---
 
@@ -243,19 +271,26 @@ class Page:
         *,
         delay_ms: float | None = None,
         timeout_ms: float | None = None,
+        humanize: bool | None = None,
     ) -> None:
         """
         Click an element by stable id, Element, or CSS selector.
 
         Prefer stable IDs from the latest :meth:`snapshot`.
+        When humanize is on, moves the mouse along a curved path first.
         """
         locator = await self._resolve_locator(target)
+        use_h = self._humanize.enabled if humanize is None else humanize
         kwargs: dict[str, Any] = {}
         if delay_ms is not None:
             kwargs["delay"] = delay_ms
+        elif use_h:
+            kwargs["delay"] = self._humanize.click_delay_ms()
         if timeout_ms is not None:
             kwargs["timeout"] = timeout_ms
         try:
+            if use_h:
+                await self._human_move_to_locator(locator)
             await locator.click(**kwargs)
         except Exception as exc:
             raise ElementNotFoundError(f"Click failed for target {target!r}: {exc}") from exc
@@ -275,17 +310,26 @@ class Page:
         delay_ms: float | None = None,
         clear: bool = False,
         timeout_ms: float | None = None,
+        humanize: bool | None = None,
     ) -> None:
         """Type into an input by id, Element, or selector (keystroke simulation)."""
         locator = await self._resolve_locator(target)
         timeout = timeout_ms
+        use_h = self._humanize.enabled if humanize is None else humanize
         try:
             if clear:
                 await locator.fill("", timeout=timeout)
-            if hasattr(locator, "press_sequentially"):
+            if use_h and delay_ms is None:
+                # Character-level delays
+                await locator.click(timeout=timeout)
+                for ch, d in zip(text, self._humanize.typing_profile(text), strict=False):
+                    await self._page.keyboard.type(ch, delay=d)
+            elif hasattr(locator, "press_sequentially"):
                 kwargs: dict[str, Any] = {}
                 if delay_ms is not None:
                     kwargs["delay"] = delay_ms
+                elif use_h:
+                    kwargs["delay"] = self._humanize.keystroke_delay_ms()
                 if timeout is not None:
                     kwargs["timeout"] = timeout
                 await locator.press_sequentially(text, **kwargs)
@@ -1013,6 +1057,24 @@ class Page:
     def _ensure_open(self) -> None:
         if self._closed:
             raise RuntimeError("Page is closed")
+
+    async def _human_move_to_locator(self, locator: Any) -> None:
+        """Move mouse along a humanized path toward the locator's box."""
+        try:
+            box = await locator.bounding_box()
+        except Exception:
+            box = None
+        if not box:
+            return
+        end = self._humanize.target_point_from_box(
+            box["x"], box["y"], box["width"], box["height"]
+        )
+        path = self._humanize.mouse_path(self._mouse_pos, end)
+        for pt in path:
+            await self._page.mouse.move(pt.x, pt.y)
+            if self._humanize.enabled:
+                await asyncio.sleep(random.uniform(0.005, 0.015))
+        self._mouse_pos = end
 
     @staticmethod
     def _target_meta(target: int | Element | str) -> Any:

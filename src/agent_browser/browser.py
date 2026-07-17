@@ -137,6 +137,7 @@ class Browser:
             config=self.config,
             on_close=self._forget_page,
             memory=self.memory,
+            humanize=bool(getattr(self.config, "humanize", False)),
         )
         self._pages.append(page)
         return page

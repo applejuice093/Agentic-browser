@@ -55,8 +55,8 @@ Each milestone has a **git branch**. Work on the branch for the active milestone
 - [x] Rule-based `plan(goal)`
 
 ### M8 — Anti-bot
-- [ ] Humanized delays / paths
-- [ ] Document ethical use limits
+- [x] Humanized delays / paths
+- [x] Document ethical use limits
 
 ### M9 — Multi-agent
 - [ ] Attach multiple agents to session

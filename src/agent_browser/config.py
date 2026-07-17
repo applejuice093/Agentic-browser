@@ -27,3 +27,7 @@ class BrowserConfig(BaseSettings):
     user_agent: str | None = None
     locale: str = "en-US"
     respect_robots_txt: bool = True
+    # M8 humanization
+    humanize: bool = False
+    humanize_min_delay_ms: float = 30
+    humanize_max_delay_ms: float = 120
