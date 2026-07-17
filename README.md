@@ -103,28 +103,32 @@ pip install -e ".[dev]"
 playwright install chromium
 ```
 
-### Minimal usage (M1 target API)
+### Minimal usage (M1 API)
 
 ```python
+import asyncio
 from agent_browser import Browser
 
 async def main():
     async with Browser(headless=True) as browser:
-        page = await browser.new_page()
-        await page.open("https://example.com")
+        page = await browser.open("https://example.com")
         snap = await page.snapshot()
-        print(snap.url, snap.title)
-        # Later milestones:
-        # btn = await page.find(role="button", text_contains="More")
-        # await page.click(btn)
+        print(snap.url, snap.title, len(snap.elements))
+        # Click by CSS selector or by stable id from snapshot:
+        # await page.click("a")
+        # await page.click(snap.elements[0].id)
+        # Offline fixture (no network):
+        # page = await browser.set_content("<button id='go'>Go</button>")
 
-# asyncio.run(main())
+asyncio.run(main())
 ```
 
 ### CLI
 
 ```bash
-agent-browser --help
+agent-browser version
+agent-browser open https://example.com
+agent-browser open https://example.com --raw-html --compact
 ```
 
 ## Development workflow

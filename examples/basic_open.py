@@ -1,7 +1,7 @@
 """
-M1 example: open a page and print a semantic-ish snapshot.
+M1 example: open a page (offline HTML) and interact via snapshot IDs.
 
-Usage (from repo root, with package installed and Chromium available):
+Usage:
 
     pip install -e ".[dev]"
     playwright install chromium
@@ -15,12 +15,41 @@ import json
 
 from agent_browser import Browser
 
+HTML = """
+<!DOCTYPE html>
+<html>
+  <head><title>Demo Shop</title></head>
+  <body>
+    <h1>Demo Shop</h1>
+    <input id="q" name="q" placeholder="Search" />
+    <button id="go" type="button">Search</button>
+    <p id="out">ready</p>
+    <script>
+      document.getElementById('go').onclick = () => {
+        document.getElementById('out').textContent =
+          'query=' + document.getElementById('q').value;
+      };
+    </script>
+  </body>
+</html>
+"""
+
 
 async def main() -> None:
     async with Browser(headless=True) as browser:
-        page = await browser.open("https://example.com")
+        page = await browser.set_content(HTML)
         snap = await page.snapshot()
-        print(json.dumps(snap.model_dump(mode="json"), indent=2))
+        print("title:", snap.title)
+        print("elements:", json.dumps([e.model_dump() for e in snap.elements], indent=2))
+
+        search = next(e for e in snap.elements if e.attributes.get("id") == "q")
+        go = next(e for e in snap.elements if e.text == "Search")
+
+        await page.fill(search.id, "wireless headphones")
+        await page.click(go.id)
+
+        out = await page.evaluate("() => document.getElementById('out').textContent")
+        print("result:", out)
 
 
 if __name__ == "__main__":

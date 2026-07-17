@@ -20,10 +20,10 @@ Each milestone has a **git branch**. Work on the branch for the active milestone
 ## Acceptance sketches
 
 ### M1 — Foundation
-- [ ] `Browser` starts Playwright and creates pages
-- [ ] `page.open`, `click`, `type`/`fill`, `snapshot`
-- [ ] CLI `agent-browser open <url>`
-- [ ] Basic tests without network flakiness where possible
+- [x] `Browser` starts Playwright and creates pages
+- [x] `page.open`, `click`, `type`/`fill`, `snapshot`
+- [x] CLI `agent-browser open <url>`
+- [x] Basic tests without network flakiness where possible
 
 ### M2 — Semantic model
 - [ ] Role/name extraction + stable IDs across updates

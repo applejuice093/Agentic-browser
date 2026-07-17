@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Agent Browser M1 Fixture</title>
+  </head>
+  <body>
+    <h1>Welcome</h1>
+    <p id="status">idle</p>
+    <form id="login">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" placeholder="you@example.com" />
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" />
+      <button id="submit-btn" type="button">Submit</button>
+    </form>
+    <a id="docs-link" href="#docs">Docs</a>
+    <button id="toggle" type="button">Toggle</button>
+    <script>
+      document.getElementById("submit-btn").addEventListener("click", function () {
+        var email = document.getElementById("email").value;
+        document.getElementById("status").textContent = "submitted:" + email;
+      });
+      document.getElementById("toggle").addEventListener("click", function () {
+        var s = document.getElementById("status");
+        s.textContent = s.textContent === "on" ? "off" : "on";
+      });
+    </script>
+  </body>
+</html>
