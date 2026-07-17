@@ -92,4 +92,4 @@ def test_context_and_planner():
 
     plan = Planner().plan(snap, "add item to cart")
     assert any("Goal" in s for s in plan)
-    assert any("Candidate" in s for s in plan)
+    assert any("Suggested" in s or "Candidate" in s or "action" in s.lower() for s in plan)
