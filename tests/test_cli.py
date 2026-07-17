@@ -27,7 +27,7 @@ def test_main_version(capsys):
         main(["version"])
     assert ei.value.code == 0
     out = capsys.readouterr().out.strip()
-    assert out == "0.3.1"
+    assert out == "0.3.2"
 
 
 def test_main_help_no_command(capsys):

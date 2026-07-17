@@ -156,13 +156,16 @@ async def agent_run(url: str) -> dict[str, Any]:
                 except Exception as e:
                     finds[f"{role}:{text}"] = [{"error": str(e)}]
 
-            # Attempt one real agent action: open Issues if present
+            # Outcome-verified Issues navigation (scoped + GitHub skill)
             action = None
-            issue_hits = finds.get("link:Issues") or []
-            if issue_hits and "ref" in issue_hits[0]:
+            try:
                 action = (
-                    await agent.click(issue_hits[0]["ref"], text_hint="Issues")
+                    await agent.click_text(
+                        "Issues", role="link", scope="nav", intent="issues"
+                    )
                 ).to_llm_dict()
+            except Exception as e:
+                action = {"ok": False, "error": str(e)}
 
             net = await agent.network()
             ms = (time.perf_counter() - t0) * 1000

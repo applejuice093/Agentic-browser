@@ -10,8 +10,20 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from agent_browser.agent.challenge import detect_challenge
+from agent_browser.agent.grounding import FindScope, best_elements
+from agent_browser.agent.outcome import (
+    OutcomeExpectation,
+    expectation_for_intent,
+    verify_outcome,
+)
 from agent_browser.agent.overlays import dismiss_overlays
 from agent_browser.agent.settle import settle_page
+from agent_browser.agent.skills.github import (
+    github_goto_tab,
+    is_github_url,
+    resolve_intent as github_resolve_intent,
+)
 from agent_browser.agent.wait import smart_wait
 from agent_browser.exceptions import (
     AgentBrowserError,
@@ -160,6 +172,13 @@ class AgentSession:
 
         self.step += 1
         d = self._detail(detail)
+        # Challenge detection before trusting content
+        challenge = await detect_challenge(self.page)
+        meta["page_gate"] = challenge.gate.value
+        meta["page_gate_confidence"] = challenge.confidence
+        if challenge.reasons:
+            meta["page_gate_reasons"] = challenge.reasons
+
         snap = await self.page.snapshot(emit_events=False)
         diff: Diff | None = self.page.last_diff if include_diff else None
         net = self.page.list_network_requests()
@@ -174,7 +193,17 @@ class AgentSession:
             step=self.step,
             note=note or ("resync" if resync else None),
             meta=meta,
+            errors=(
+                [challenge.recoverable_hint]
+                if challenge.recoverable_hint and challenge.is_blocked
+                else None
+            ),
         )
+        obs.page_gate = challenge.gate.value
+        obs.page_gate_confidence = challenge.confidence
+        obs.page_gate_hint = challenge.recoverable_hint
+        if challenge.is_blocked:
+            obs.note = (obs.note or "") + f" | GATE:{challenge.gate.value}"
         self._last_obs = obs
         return obs
 
@@ -247,13 +276,107 @@ class AgentSession:
         observe: bool | None = None,
         detail: DetailLevel | str | None = None,
         text_hint: str | None = None,
+        expect: OutcomeExpectation | dict[str, Any] | None = None,
+        intent: str | None = None,
     ) -> ActionResult:
+        exp = self._coerce_expectation(expect, intent=intent, text_hint=text_hint)
         return await self._act(
             "click",
             ref,
             observe=observe,
             detail=detail,
             text_hint=text_hint,
+            expectation=exp,
+            intent=intent,
+        )
+
+    async def click_text(
+        self,
+        text: str,
+        *,
+        role: str | None = "link",
+        scope: str | FindScope = "nav",
+        exact: bool = False,
+        observe: bool | None = None,
+        detail: DetailLevel | str | None = None,
+        intent: str | None = None,
+        prefer_skill: bool = True,
+    ) -> ActionResult:
+        """
+        Find best grounded match for ``text`` and click with outcome verification.
+
+        Uses scoped ranking (nav-first by default) so GitHub commit bodies do not
+        steal 'Issues' clicks. On github.com, may use URL-tab skill when safer.
+        """
+        intent_s = intent or text
+        # Domain skill: deterministic tab navigation on GitHub
+        if prefer_skill and is_github_url(self.page.url):
+            gh = github_resolve_intent(intent_s)
+            if gh and gh.href_hint:
+                t0 = time.perf_counter()
+                url_before = self.page.url
+                try:
+                    nav = await github_goto_tab(self.page, gh)
+                    if nav.get("ok"):
+                        self._settled_once = False
+                        await self.prepare(force=True, scroll_probe=False)
+                        outcome = await verify_outcome(
+                            self.page,
+                            url_before=url_before,
+                            expectation=gh.expectation,
+                        )
+                        do_obs = self.observe_after_action if observe is None else observe
+                        obs = (
+                            await self.observe(detail=detail, prepare=False)
+                            if do_obs
+                            else None
+                        )
+                        ok = outcome.verified
+                        return ActionResult(
+                            ok=ok,
+                            action="click_text:github_skill",
+                            error_code=ErrorCode.OK if ok else ErrorCode.OUTCOME_NOT_MET,
+                            error_message=None if ok else outcome.message,
+                            elapsed_ms=(time.perf_counter() - t0) * 1000,
+                            navigated=self.page.url != url_before,
+                            url_before=url_before,
+                            url_after=self.page.url,
+                            outcome_verified=outcome.verified,
+                            observation=obs,
+                            extra={"skill": "github", "intent": gh.name, "nav": nav},
+                        )
+                except Exception as exc:
+                    code, msg = _map_error(exc)
+                    return ActionResult(
+                        ok=False,
+                        action="click_text:github_skill",
+                        error_code=code,
+                        error_message=msg,
+                        elapsed_ms=(time.perf_counter() - t0) * 1000,
+                        url_before=url_before,
+                        url_after=self.page.url,
+                        outcome_verified=False,
+                    )
+
+        matches = await self.find(
+            role=role, text=text, exact=exact, scope=scope
+        )
+        if not matches:
+            return ActionResult(
+                ok=False,
+                action="click_text",
+                error_code=ErrorCode.ELEMENT_NOT_FOUND,
+                error_message=f"no grounded match for text={text!r} scope={scope}",
+                outcome_verified=False,
+            )
+        exp = expectation_for_intent(intent_s, text_hint=text)
+        return await self.click(
+            int(matches[0]["ref"]),
+            observe=observe,
+            detail=detail,
+            text_hint=text,
+            expect=exp,
+            intent=intent_s,
         )
 
     async def type(
@@ -345,6 +468,19 @@ class AgentSession:
     ) -> ActionResult:
         return await self.type(ref, text, clear=True, observe=observe, detail=detail)
 
+    def _coerce_expectation(
+        self,
+        expect: OutcomeExpectation | dict[str, Any] | None,
+        *,
+        intent: str | None = None,
+        text_hint: str | None = None,
+    ) -> OutcomeExpectation | None:
+        if isinstance(expect, OutcomeExpectation):
+            return expect
+        if isinstance(expect, dict):
+            return OutcomeExpectation.model_validate(expect)
+        return expectation_for_intent(intent, text_hint=text_hint)
+
     async def _act(
         self,
         action: str,
@@ -353,19 +489,40 @@ class AgentSession:
         observe: bool | None = None,
         detail: DetailLevel | str | None = None,
         text_hint: str | None = None,
+        expectation: OutcomeExpectation | None = None,
+        intent: str | None = None,
     ) -> ActionResult:
         t0 = time.perf_counter()
         url_before = self.page.url
         do_obs = self.observe_after_action if observe is None else observe
         target = ref
         try:
+            # Refuse actions on hard gates
+            challenge = await detect_challenge(self.page)
+            if challenge.is_blocked and challenge.gate.value in (
+                "js_challenge",
+                "captcha",
+                "rate_limit",
+                "soft_block",
+            ):
+                return ActionResult(
+                    ok=False,
+                    action=action,
+                    error_code=ErrorCode.CHALLENGE,
+                    error_message=challenge.recoverable_hint or challenge.gate.value,
+                    elapsed_ms=(time.perf_counter() - t0) * 1000,
+                    url_before=url_before,
+                    url_after=self.page.url,
+                    outcome_verified=False,
+                    extra={"page_gate": challenge.gate.value},
+                )
+
             if not self.page.last_snapshot:
                 await self.page.snapshot(emit_events=False)
 
             async def _do() -> None:
                 nonlocal target
                 if action == "click":
-                    # scroll into view for reliability
                     try:
                         loc = self.page.playwright_page.locator(
                             f'[data-agent-id="{target}"]'
@@ -385,20 +542,27 @@ class AgentSession:
                     raise
                 await self.resync(detail=detail)
                 if text_hint:
-                    matches = await self.find(text=text_hint)
+                    matches = await self.find(text=text_hint, scope="nav")
+                    if not matches:
+                        matches = await self.find(text=text_hint, scope="any")
                     if matches:
                         target = int(matches[0]["ref"])
                     else:
                         raise
-                else:
-                    # try same ref after resync stamp
-                    pass
                 await _do()
 
             try:
                 await self.page.wait_for_load_state("domcontentloaded")
             except Exception:
                 pass
+
+            # Outcome verification (research: don't treat exception-free as success)
+            if expectation is None and (intent or text_hint):
+                expectation = expectation_for_intent(intent, text_hint=text_hint)
+            outcome = await verify_outcome(
+                self.page, url_before=url_before, expectation=expectation
+            )
+
             elapsed = (time.perf_counter() - t0) * 1000
             navigated = self.page.url != url_before
             if navigated:
@@ -408,15 +572,20 @@ class AgentSession:
                 if do_obs
                 else None
             )
+            ok = outcome.verified if expectation is not None else True
             return ActionResult(
-                ok=True,
+                ok=ok,
                 action=action,
+                error_code=ErrorCode.OK if ok else ErrorCode.OUTCOME_NOT_MET,
+                error_message=None if ok else outcome.message,
                 elapsed_ms=elapsed,
                 target_ref=target,
                 navigated=navigated,
                 url_before=url_before,
                 url_after=self.page.url,
+                outcome_verified=outcome.verified if expectation is not None else None,
                 observation=obs,
+                extra={"outcome_checks": outcome.checks, "intent": intent},
             )
         except Exception as exc:
             code, msg = _map_error(exc)
@@ -431,6 +600,7 @@ class AgentSession:
                 target_ref=target,
                 url_before=url_before,
                 url_after=self.page.url,
+                outcome_verified=False,
             )
 
     async def wait(
@@ -462,46 +632,67 @@ class AgentSession:
         name: str | None = None,
         text: str | None = None,
         exact: bool = False,
+        scope: str | FindScope = "any",
     ) -> list[dict[str, Any]]:
-        """Return compact ref dicts matching criteria."""
-        els: list[Any] = []
-        if role:
-            els = await self.page.get_all_by_role(
-                role, name=name if name else None, exact=exact
-            )
-        elif name:
-            els = await self.page.get_all_by_label(name, exact=exact)
-        elif text:
-            el = await self.page.get_by_text(text, exact=exact)
-            els = [el] if el else []
-        if text and els:
-            t = text.lower()
-            if exact:
-                els = [
-                    e
-                    for e in els
-                    if e
-                    and (
-                        (e.text or "").strip().lower() == t
-                        or (e.name or "").strip().lower() == t
-                    )
-                ]
-            else:
-                els = [
-                    e
-                    for e in els
-                    if e and (t in (e.text or "").lower() or t in (e.name or "").lower())
-                ]
+        """
+        Return compact ref dicts using scoped grounding ranks.
+
+        ``scope``: any | nav | main | form — prefer nav for tabs like Issues.
+        """
+        sc = FindScope(scope) if isinstance(scope, str) else scope
+        if not self.page.last_snapshot:
+            await self.page.snapshot(emit_events=False)
+        elements = list(self.page.last_snapshot.elements) if self.page.last_snapshot else []
+
+        # Prefer exact short labels for common nav words
+        use_exact = exact
+        if text and text.strip().lower() in {
+            "issues",
+            "code",
+            "actions",
+            "security",
+            "wiki",
+            "projects",
+            "pull requests",
+        }:
+            use_exact = True
+            if sc == FindScope.ANY:
+                sc = FindScope.NAV
+
+        grounded = best_elements(
+            elements,
+            role=role,
+            name=name,
+            text=text,
+            exact=use_exact,
+            scope=sc,
+            limit=10,
+            min_score=3.0 if sc == FindScope.NAV else 2.0,
+        )
+        # href-path boost path: if looking for Issues, prefer href ending /issues
+        if text and grounded:
+            key = text.strip().lower().replace(" ", "")
+            def href_key(el: Any) -> int:
+                h = (el.attributes.get("href") or "").lower().rstrip("/")
+                if h.endswith("/" + key) or h.endswith("/" + text.strip().lower()):
+                    return 0
+                if f"/{text.strip().lower()}" in h and "/issues/" not in h + "/":
+                    # /issues exact tab not /issues/123
+                    if h.endswith("/issues") or h.endswith("/pulls") or h.endswith("/actions"):
+                        return 0
+                return 1
+            grounded = sorted(grounded, key=lambda e: (href_key(e), e.id))
+
         return [
             {
                 "ref": e.id,
                 "role": e.role,
-                "name": e.name,
+                "name": (e.name or "")[:80] or None,
                 "text": (e.text or "")[:80],
                 "tag": e.type,
+                "href": e.attributes.get("href"),
             }
-            for e in els
-            if e is not None
+            for e in grounded
         ]
 
     async def network(
@@ -526,10 +717,32 @@ class AgentSession:
             )
             return o.to_llm_dict()
         if name == "browser_click":
+            if "text" in args and "ref" not in args:
+                r = await self.click_text(
+                    args["text"],
+                    role=args.get("role", "link"),
+                    scope=args.get("scope", "nav"),
+                    exact=args.get("exact", False),
+                    observe=args.get("observe", True),
+                    intent=args.get("intent") or args.get("text"),
+                )
+                return r.to_llm_dict()
             r = await self.click(
                 int(args["ref"]),
                 observe=args.get("observe", True),
-                text_hint=args.get("text_hint"),
+                text_hint=args.get("text_hint") or args.get("text"),
+                intent=args.get("intent"),
+                expect=args.get("expect"),
+            )
+            return r.to_llm_dict()
+        if name == "browser_click_text":
+            r = await self.click_text(
+                args["text"],
+                role=args.get("role", "link"),
+                scope=args.get("scope", "nav"),
+                exact=args.get("exact", False),
+                observe=args.get("observe", True),
+                intent=args.get("intent") or args["text"],
             )
             return r.to_llm_dict()
         if name == "browser_type":
@@ -556,6 +769,7 @@ class AgentSession:
                     name=args.get("name"),
                     text=args.get("text"),
                     exact=args.get("exact", False),
+                    scope=args.get("scope", "any"),
                 ),
             }
         if name == "browser_network":

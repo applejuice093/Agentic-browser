@@ -28,6 +28,8 @@ class ErrorCode(str, Enum):
     PAGE_CLOSED = "page_closed"
     CAPTCHA_SUSPECTED = "captcha_suspected"
     BLOCKED = "blocked"
+    OUTCOME_NOT_MET = "outcome_not_met"
+    CHALLENGE = "challenge"
     UNKNOWN = "unknown"
 
 
@@ -116,6 +118,10 @@ class Observation(BaseModel):
     # High-signal summary for marketing/SPA landings
     summary: str | None = None
     meta: dict[str, Any] = Field(default_factory=dict)
+    # Environment gate (bot wall / captcha / open)
+    page_gate: str | None = None
+    page_gate_confidence: float | None = None
+    page_gate_hint: str | None = None
 
     def to_llm_dict(self) -> dict[str, Any]:
         """Drop nulls / empty fields for cheaper prompts."""
@@ -156,6 +162,7 @@ class ActionResult(BaseModel):
     navigated: bool = False
     url_before: str | None = None
     url_after: str | None = None
+    outcome_verified: bool | None = None
     observation: Observation | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.2 — Grounding, outcome verification, challenge gates
+
+### Research-backed systems
+
+- **Outcome verification** (BrowserGym-style): `ok` only if post-conditions hold (URL/text/selector), not merely exception-free
+- **Scoped grounding**: nav/main/form ranking; penalize commit/PR body false matches (dual-grounding inspiration)
+- **Page gate classifier**: js_challenge / captcha / login_wall / rate_limit — surface to LLM, no bypass claims
+- **GitHub skill pack**: deterministic tab URLs for Issues/PRs/Actions when on a repo
+- Tools: `browser_click_text`, click-by-text with `scope=nav`
+
+### Proven on GitHub next.js
+
+- Before: Issues click `ok` but stayed on repo URL (false success)
+- After: lands on `/issues` with `outcome_verified=true`
+
 ## 0.3.1 — Production agent systems (overlays, settle, recovery)
 
 ### Added

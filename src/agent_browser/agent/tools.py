@@ -46,18 +46,53 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "name": "browser_click",
-        "description": "Click an element by ref (integer from observation.interactive[].ref).",
+        "description": (
+            "Click by ref OR by text. Prefer text+scope=nav for tabs (Issues, PRs). "
+            "Success requires outcome verification when intent implies navigation "
+            "(e.g. Issues → URL must contain /issues). ok=false if outcome not met."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
                 "ref": {"type": "integer", "description": "Stable element ref"},
+                "text": {
+                    "type": "string",
+                    "description": "Visible label to ground (use with scope=nav for repo tabs)",
+                },
+                "scope": {
+                    "type": "string",
+                    "enum": ["any", "nav", "main", "form"],
+                    "default": "nav",
+                },
+                "role": {"type": "string", "default": "link"},
+                "intent": {
+                    "type": "string",
+                    "description": "Natural intent for outcome checks, e.g. 'open issues'",
+                },
                 "observe": {
                     "type": "boolean",
                     "default": True,
                     "description": "Return post-action observation",
                 },
             },
-            "required": ["ref"],
+        },
+    },
+    {
+        "name": "browser_click_text",
+        "description": "Scoped text click with outcome verification (nav-first grounding).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string"},
+                "scope": {
+                    "type": "string",
+                    "enum": ["any", "nav", "main", "form"],
+                    "default": "nav",
+                },
+                "role": {"type": "string", "default": "link"},
+                "intent": {"type": "string"},
+            },
+            "required": ["text"],
         },
     },
     {
@@ -109,7 +144,10 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "name": "browser_find",
-        "description": "Find elements by role/name/text without CSS. Returns matching refs.",
+        "description": (
+            "Find elements by role/name/text with scoped grounding. "
+            "Use scope=nav for Issues/PRs/Code tabs to avoid commit/PR body false matches."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
@@ -117,6 +155,11 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 "name": {"type": "string"},
                 "text": {"type": "string"},
                 "exact": {"type": "boolean", "default": False},
+                "scope": {
+                    "type": "string",
+                    "enum": ["any", "nav", "main", "form"],
+                    "default": "any",
+                },
             },
         },
     },
