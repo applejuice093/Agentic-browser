@@ -1,0 +1,100 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-browser"
+version = "0.1.0"
+description = "AI Agent-First Browser: semantic web world model for LLM agents"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Agentic Browser Contributors" },
+]
+keywords = [
+    "browser",
+    "agent",
+    "llm",
+    "automation",
+    "playwright",
+    "semantic-dom",
+    "accessibility",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+dependencies = [
+    "playwright>=1.49.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.6.0",
+    "httpx>=0.28.0",
+    "websockets>=14.0",
+    "lxml>=5.3.0",
+    "orjson>=3.10.0",
+    "typing-extensions>=4.12.0",
+]
+
+[project.optional-dependencies]
+vision = [
+    "pytesseract>=0.3.13",
+    "Pillow>=11.0.0",
+]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "pre-commit>=4.0.0",
+]
+all = [
+    "agent-browser[vision,dev]",
+]
+
+[project.urls]
+Repository = "https://github.com/applejuice093/Agentic-browser"
+Issues = "https://github.com/applejuice093/Agentic-browser/issues"
+
+[project.scripts]
+agent-browser = "agent_browser.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_browser"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/examples",
+    "/README.md",
+    "/deep-research-report.md",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "examples"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["agent_browser"]
+mypy_path = "src"

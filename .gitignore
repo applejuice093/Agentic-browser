@@ -1,0 +1,68 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.cursor/
+.grok/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.hypothesis/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Playwright / browsers (local install caches)
+playwright/.cache/
+
+# Runtime / session data
+*.db
+*.sqlite
+*.sqlite3
+data/
+sessions/
+logs/
+*.log
+screenshots/
+.cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Packaging
+pip-wheel-metadata/
