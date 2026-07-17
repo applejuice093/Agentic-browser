@@ -5,6 +5,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal
 
+from agent_browser.accessibility.queries import (
+    Exactness,
+    filter_by_label,
+    filter_by_placeholder,
+    filter_by_role,
+    filter_by_test_id,
+    filter_by_text,
+)
 from agent_browser.events.bus import EventBus, EventHandler
 from agent_browser.events.diffing import DiffEngine
 from agent_browser.events.monitor import MutationMonitor
@@ -33,6 +41,7 @@ class Page:
     M2: semantic ``snapshot()``, stable IDs, ``find`` / ``find_all``.
     M3: incremental ``diff``, event bus, MutationObserver ``watch``.
     M4: OCR / vision (``get_text_in_screenshot``, ``detect_ui``).
+    M6: ``get_by_role`` / ``get_by_label`` accessibility finders.
     """
 
     def __init__(
@@ -518,6 +527,109 @@ class Page:
         if refresh:
             await self.snapshot()
         return self._semantic.get(element_id) or self._element_registry.get(element_id)
+
+    # --- accessibility finders (M6) ---
+
+    async def get_by_role(
+        self,
+        role: str,
+        *,
+        name: str | None = None,
+        exact: bool = False,
+        visible_only: bool = True,
+        refresh: bool = True,
+    ) -> Element | None:
+        """Playwright-style role finder against the semantic model."""
+        matches = await self.get_all_by_role(
+            role, name=name, exact=exact, visible_only=visible_only, refresh=refresh
+        )
+        return matches[0] if matches else None
+
+    async def get_all_by_role(
+        self,
+        role: str,
+        *,
+        name: str | None = None,
+        exact: bool = False,
+        visible_only: bool = True,
+        refresh: bool = True,
+    ) -> list[Element]:
+        if refresh or not self._element_registry:
+            await self.snapshot()
+        return filter_by_role(
+            list(self._element_registry.values()),
+            role,
+            name=name,
+            exact=exact,
+            visible_only=visible_only,
+        )
+
+    async def get_by_label(
+        self,
+        label: str,
+        *,
+        exact: bool = False,
+        refresh: bool = True,
+    ) -> Element | None:
+        """Find a control by associated label / accessible name."""
+        matches = await self.get_all_by_label(label, exact=exact, refresh=refresh)
+        return matches[0] if matches else None
+
+    async def get_all_by_label(
+        self,
+        label: str,
+        *,
+        exact: bool = False,
+        refresh: bool = True,
+    ) -> list[Element]:
+        if refresh or not self._element_registry:
+            await self.snapshot()
+        match: Exactness = "exact" if exact else "contains"
+        return filter_by_label(
+            list(self._element_registry.values()), label, match=match
+        )
+
+    async def get_by_placeholder(
+        self,
+        placeholder: str,
+        *,
+        exact: bool = False,
+        refresh: bool = True,
+    ) -> Element | None:
+        if refresh or not self._element_registry:
+            await self.snapshot()
+        match: Exactness = "exact" if exact else "contains"
+        found = filter_by_placeholder(
+            list(self._element_registry.values()), placeholder, match=match
+        )
+        return found[0] if found else None
+
+    async def get_by_text(
+        self,
+        text: str,
+        *,
+        exact: bool = False,
+        refresh: bool = True,
+    ) -> Element | None:
+        if refresh or not self._element_registry:
+            await self.snapshot()
+        match: Exactness = "exact" if exact else "contains"
+        found = filter_by_text(list(self._element_registry.values()), text, match=match)
+        return found[0] if found else None
+
+    async def get_by_test_id(
+        self,
+        test_id: str,
+        *,
+        attr: str = "data-testid",
+        refresh: bool = True,
+    ) -> Element | None:
+        if refresh or not self._element_registry:
+            await self.snapshot()
+        found = filter_by_test_id(
+            list(self._element_registry.values()), test_id, attr=attr
+        )
+        return found[0] if found else None
 
     async def content(self) -> str:
         """Return raw HTML of the current page."""

@@ -46,8 +46,8 @@ Each milestone has a **git branch**. Work on the branch for the active milestone
 - [ ] GraphQL detection basics
 
 ### M6 — Accessibility polish
-- [ ] `get_by_role` / `get_by_label` style finders
-- [ ] Robust AX merge
+- [x] `get_by_role` / `get_by_label` style finders
+- [x] Robust AX merge
 
 ### M7 — Memory & planner
 - [ ] Session KV + action history
