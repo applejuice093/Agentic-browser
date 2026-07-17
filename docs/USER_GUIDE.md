@@ -414,7 +414,22 @@ Design source: [`../deep-research-report.md`](../deep-research-report.md)
 
 ---
 
-## 18. LLM agent loop (recommended)
+## 18. Add agent-browser to Claude / Cursor / your agent
+
+**Full guide:** [`mcp.md`](./mcp.md)
+
+```bash
+pip install -e ".[mcp]"
+playwright install chromium
+```
+
+| Method | Use |
+|--------|-----|
+| MCP | `python -m agent_browser.mcp` in Cursor / Claude Desktop config |
+| Python tools | `tools_as_openai()` / `tools_as_anthropic()` + `AgentSession.call_tool` |
+| CLI | `agent-browser open` / `scrape` |
+
+## 19. LLM agent loop (recommended)
 
 Prefer **AgentSession** over dumping HTML or full snapshots into the model:
 
@@ -441,7 +456,7 @@ async with Browser(headless=True) as browser:
 
 Details: [`agent-native-loop.md`](./agent-native-loop.md).
 
-## 19. Scraping data with the agent browser
+## 20. Scraping data with the agent browser
 
 This product is an **agent browser**, not a classic HTML parser. Prefer:
 
@@ -476,15 +491,13 @@ then exports JSON for agents or pipelines.
 **Legal note:** only scrape sites you are allowed to access; respect robots.txt
 and terms of service. Prefer user-owned sessions for authenticated data.
 
-## 20. Examples
+## 21. Examples
 
 ```bash
 python examples/agent_loop_demo.py
+python examples/openai_tool_agent.py
+python -m agent_browser.mcp   # MCP stdio (for hosts)
 python examples/basic_open.py
-python examples/semantic_find.py
-python examples/events_diff.py
-python examples/vision_ocr.py
-python examples/network_api.py
 python examples/agent_scrape.py --pages 2
-python examples/compare_scrape_methods.py --pages 1
+python examples/benchmark_hard_site.py
 ```

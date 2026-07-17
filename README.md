@@ -75,15 +75,31 @@ Python Agent Browser API
 | M9 | Done | Multi-agent sessions |
 | M10 | Done | Docs, security, polish |
 
-**User guide:** [`docs/USER_GUIDE.md`](./docs/USER_GUIDE.md) · **Agent loop:** [`docs/agent-native-loop.md`](./docs/agent-native-loop.md) · Security: [`docs/security.md`](./docs/security.md) · Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
+**User guide:** [`docs/USER_GUIDE.md`](./docs/USER_GUIDE.md) · **Add to your agent (MCP):** [`docs/mcp.md`](./docs/mcp.md) · **Agent loop:** [`docs/agent-native-loop.md`](./docs/agent-native-loop.md) · Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
 
-### LLM agent loop (v0.3)
+### Add to Claude / Cursor (MCP)
+
+```bash
+pip install -e ".[mcp]"
+playwright install chromium
+```
+
+Point your host at:
+
+```text
+python -m agent_browser.mcp
+# or: agent-browser-mcp
+```
+
+See full configs for **Cursor** and **Claude Desktop** in [`docs/mcp.md`](./docs/mcp.md).
+
+### LLM agent loop (library)
 
 ```python
 async with Browser() as browser:
     agent = await browser.open_agent("https://example.com")
     obs = await agent.observe(max_tokens=1500)   # compact refs, not full HTML
-    result = await agent.click(obs.interactive[0].ref)
+    result = await agent.click_text("More information", scope="any")
     # result.ok, result.error_code, result.observation
 ```
 

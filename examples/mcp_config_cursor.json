@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "agent-browser": {
+      "command": "python",
+      "args": ["-m", "agent_browser.mcp"],
+      "env": {
+        "AGENT_BROWSER_HEADLESS": "true",
+        "AGENT_BROWSER_MAX_TOKENS": "2000",
+        "AGENT_BROWSER_DETAIL": "normal",
+        "AGENT_BROWSER_SETTLE_MS": "8000",
+        "AGENT_BROWSER_ALLOWED_HOSTS": "github.com,example.com,quotes.toscrape.com"
+      }
+    }
+  }
+}

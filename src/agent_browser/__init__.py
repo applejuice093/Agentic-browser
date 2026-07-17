@@ -9,6 +9,7 @@ from agent_browser.agent import (
     TOOL_DEFINITIONS,
     AgentSession,
     tool_names,
+    tools_as_anthropic,
     tools_as_openai,
 )
 from agent_browser.browser import Browser
@@ -45,7 +46,7 @@ from agent_browser.scrape import scrape_page, scrape_url, snapshot_to_scrape_res
 from agent_browser.semantic import SemanticDOMEngine, StableIDAssigner
 from agent_browser.vision import OCREngine, UIDetector, VisionDependencyError, VisionEngine
 
-__version__ = "0.3.2"
+__version__ = "0.4.0"
 
 __all__ = [
     "Browser",
@@ -58,6 +59,7 @@ __all__ = [
     "ErrorCode",
     "TOOL_DEFINITIONS",
     "tools_as_openai",
+    "tools_as_anthropic",
     "tool_names",
     "Element",
     "BoundingBox",

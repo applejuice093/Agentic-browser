@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-browser"
-version = "0.3.2"
-description = "AI Agent-First Browser: semantic web world model for LLM agents"
+version = "0.4.0"
+description = "AI Agent-First Browser: semantic web world model for LLM agents (library + MCP)"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
@@ -16,6 +16,7 @@ keywords = [
     "browser",
     "agent",
     "llm",
+    "mcp",
     "automation",
     "playwright",
     "semantic-dom",
@@ -48,6 +49,9 @@ vision = [
     "pytesseract>=0.3.13",
     "Pillow>=11.0.0",
 ]
+mcp = [
+    "mcp>=1.0.0",
+]
 dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
@@ -55,9 +59,10 @@ dev = [
     "ruff>=0.8.0",
     "mypy>=1.13.0",
     "pre-commit>=4.0.0",
+    "agent-browser[mcp]",
 ]
 all = [
-    "agent-browser[vision,dev]",
+    "agent-browser[vision,dev,mcp]",
 ]
 
 [project.urls]
@@ -66,6 +71,7 @@ Issues = "https://github.com/applejuice093/Agentic-browser/issues"
 
 [project.scripts]
 agent-browser = "agent_browser.cli:main"
+agent-browser-mcp = "agent_browser.mcp.server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agent_browser"]

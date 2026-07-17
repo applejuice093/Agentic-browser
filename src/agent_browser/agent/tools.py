@@ -200,7 +200,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
 
 
 def tools_as_openai() -> list[dict[str, Any]]:
-    """OpenAI Chat Completions tools format."""
+    """OpenAI Chat Completions / compatible tools format."""
     out = []
     for t in TOOL_DEFINITIONS:
         out.append(
@@ -214,6 +214,18 @@ def tools_as_openai() -> list[dict[str, Any]]:
             }
         )
     return out
+
+
+def tools_as_anthropic() -> list[dict[str, Any]]:
+    """Anthropic Messages API tools format."""
+    return [
+        {
+            "name": t["name"],
+            "description": t["description"],
+            "input_schema": t["parameters"],
+        }
+        for t in TOOL_DEFINITIONS
+    ]
 
 
 def tool_names() -> list[str]:

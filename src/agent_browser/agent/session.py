@@ -717,20 +717,28 @@ class AgentSession:
             )
             return o.to_llm_dict()
         if name == "browser_click":
-            if "text" in args and "ref" not in args:
+            ref_val = args.get("ref")
+            text_val = args.get("text")
+            if text_val and ref_val is None:
                 r = await self.click_text(
-                    args["text"],
+                    text_val,
                     role=args.get("role", "link"),
                     scope=args.get("scope", "nav"),
                     exact=args.get("exact", False),
                     observe=args.get("observe", True),
-                    intent=args.get("intent") or args.get("text"),
+                    intent=args.get("intent") or text_val,
                 )
                 return r.to_llm_dict()
+            if ref_val is None:
+                return {
+                    "ok": False,
+                    "error_code": ErrorCode.INVALID_ARGS.value,
+                    "error_message": "browser_click requires ref or text",
+                }
             r = await self.click(
-                int(args["ref"]),
+                int(ref_val),
                 observe=args.get("observe", True),
-                text_hint=args.get("text_hint") or args.get("text"),
+                text_hint=args.get("text_hint") or text_val,
                 intent=args.get("intent"),
                 expect=args.get("expect"),
             )

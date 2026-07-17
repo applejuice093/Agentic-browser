@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0 — MCP server for Claude / Cursor / any MCP host
+
+### Added
+
+- **`python -m agent_browser.mcp`** / **`agent-browser-mcp`** FastMCP stdio server
+- **`McpSessionManager`** — shared Browser + AgentSession for tool hosts
+- Host env: `AGENT_BROWSER_HEADLESS`, `MAX_TOKENS`, `ALLOWED_HOSTS`, …
+- **`tools_as_anthropic()`** export
+- User guide: **`docs/mcp.md`** (Cursor, Claude Desktop, OpenAI tool loop)
+- Example configs: `examples/mcp_config_cursor.json`, `examples/openai_tool_agent.py`
+
 ## 0.3.2 — Grounding, outcome verification, challenge gates
 
 ### Research-backed systems
