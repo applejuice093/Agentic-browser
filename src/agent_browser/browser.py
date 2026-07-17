@@ -20,6 +20,7 @@ class Browser:
     M1: wraps Playwright (Chromium / Firefox / WebKit), creates pages,
     and supports ``open(url)`` plus async context-manager lifecycle.
     M7: shared session :class:`MemoryStore`.
+    M9: ``create_multi_agent_session()`` helper.
     """
 
     def __init__(
@@ -171,6 +172,13 @@ class Browser:
             await page.close()
             raise NavigationError(f"Failed to set page content: {exc}") from exc
         return page
+
+    def create_multi_agent_session(self) -> Any:
+        """Create a MultiAgentSession bound to this browser (M9)."""
+        from agent_browser.multiagent.session import MultiAgentSession
+
+        session = MultiAgentSession(session_id=self.session_id, browser=self)
+        return session
 
     async def __aenter__(self) -> Self:
         return await self.start()

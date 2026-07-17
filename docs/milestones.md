@@ -59,8 +59,8 @@ Each milestone has a **git branch**. Work on the branch for the active milestone
 - [x] Document ethical use limits
 
 ### M9 — Multi-agent
-- [ ] Attach multiple agents to session
-- [ ] Event subscription per agent
+- [x] Attach multiple agents to session
+- [x] Event subscription per agent
 
 ### M10 — Polish
 - [ ] Full test suite + docs
