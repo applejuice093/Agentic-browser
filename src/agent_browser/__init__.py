@@ -29,6 +29,7 @@ from agent_browser.semantic import SemanticDOMEngine, StableIDAssigner
 from agent_browser.memory import MemoryStore
 from agent_browser.multiagent import AgentHandle, MultiAgentSession
 from agent_browser.planning import ContextBuilder, Planner
+from agent_browser.scrape import scrape_page, scrape_url, snapshot_to_scrape_result
 from agent_browser.vision import OCREngine, UIDetector, VisionDependencyError, VisionEngine
 
 __version__ = "0.2.1"
@@ -57,6 +58,9 @@ __all__ = [
     "VisionError",
     "NetworkMonitor",
     "NetworkRequest",
+    "scrape_page",
+    "scrape_url",
+    "snapshot_to_scrape_result",
     "MemoryStore",
     "ContextBuilder",
     "Planner",

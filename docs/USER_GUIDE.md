@@ -414,7 +414,42 @@ Design source: [`../deep-research-report.md`](../deep-research-report.md)
 
 ---
 
-## 18. Examples
+## 18. Scraping data with the agent browser
+
+This product is an **agent browser**, not a classic HTML parser. Prefer:
+
+1. `open` / `snapshot` — semantic world model  
+2. `get_by_role` / `find` — locate controls without brittle CSS  
+3. `evaluate` — small in-page extractors when the DOM pattern is known  
+4. `network_requests` / `wait_for_api` — capture JSON APIs behind the UI  
+5. `context` / `plan` — feed structured state to an LLM agent  
+
+### One-shot scrape helper
+
+```python
+from agent_browser import scrape_url
+import asyncio, json
+
+data = asyncio.run(scrape_url("https://example.com"))
+print(json.dumps(data["headings"], indent=2))
+print(data["counts"])
+```
+
+### Quotes demo (multi-page)
+
+```bash
+python examples/agent_scrape.py
+python examples/agent_scrape.py --pages 2 --out data/scrape_result.json
+python examples/agent_scrape.py --url https://books.toscrape.com --out data/books.json
+```
+
+Uses Playwright under the hood with **stable element IDs** to click “Next”,
+then exports JSON for agents or pipelines.
+
+**Legal note:** only scrape sites you are allowed to access; respect robots.txt
+and terms of service. Prefer user-owned sessions for authenticated data.
+
+## 19. Examples
 
 ```bash
 python examples/basic_open.py
@@ -422,4 +457,5 @@ python examples/semantic_find.py
 python examples/events_diff.py
 python examples/vision_ocr.py
 python examples/network_api.py
+python examples/agent_scrape.py --pages 2
 ```
