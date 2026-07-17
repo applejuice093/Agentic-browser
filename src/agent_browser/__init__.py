@@ -28,7 +28,7 @@ from agent_browser.multiagent import AgentHandle, MultiAgentSession
 from agent_browser.planning import ContextBuilder, Planner
 from agent_browser.vision import OCREngine, UIDetector, VisionDependencyError, VisionEngine
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "Browser",

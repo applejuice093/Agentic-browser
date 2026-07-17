@@ -63,6 +63,9 @@ Each milestone has a **git branch**. Work on the branch for the active milestone
 - [x] Event subscription per agent
 
 ### M10 — Polish
-- [ ] Full test suite + docs
-- [ ] Performance pass
-- [ ] Security review notes
+- [x] Full test suite + docs
+- [x] Performance pass
+- [x] Security review notes
+
+### Deferred
+- **M5** Network/API introspection — scaffold in `network/`; implement on `milestone/m5-network`

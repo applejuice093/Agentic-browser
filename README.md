@@ -60,22 +60,26 @@ Python Agent Browser API
 └── docs/
 ```
 
-## Milestones & branches
+## Status (v0.2.0)
 
-Each milestone has a dedicated branch. Implement features on the milestone branch, then merge toward `master` / `dev`.
+| Milestone | Status | Focus |
+|-----------|--------|--------|
+| M1 | Done | Core API + Playwright |
+| M2 | Done | Semantic DOM + stable IDs |
+| M3 | Done | Diffs + event streaming |
+| M4 | Done | OCR / vision hooks |
+| M5 | Deferred | Network/API (scaffold only) |
+| M6 | Done | `get_by_role` / `get_by_label` |
+| M7 | Done | Memory, context, plan |
+| M8 | Done | Humanized input |
+| M9 | Done | Multi-agent sessions |
+| M10 | Done | Docs, security, polish |
 
-| Branch | Milestone | Focus |
-|--------|-----------|--------|
-| `milestone/m1-foundation` | M1 | Core API + Playwright; `open` / `click` / `type` / raw snapshot |
-| `milestone/m2-semantic-dom` | M2 | Semantic DOM + AX merge, stable IDs, `snapshot()` JSON |
-| `milestone/m3-diffs-events` | M3 | Incremental diffs & event streaming |
-| `milestone/m4-vision-ocr` | M4 | Tesseract/OCR + vision APIs |
-| `milestone/m5-network` | M5 | Network capture, wait_for_api, GraphQL basics |
-| `milestone/m6-accessibility` | M6 | a11y polish, `get_by_role` / `get_by_label` |
-| `milestone/m7-memory-planner` | M7 | Session memory, context summary, `plan()` |
-| `milestone/m8-antibot` | M8 | Humanized mouse/keyboard, anti-fingerprint |
-| `milestone/m9-multiagent` | M9 | Concurrent agents, event subscriptions |
-| `milestone/m10-polish` | M10 | Tests, docs, optimization, security review |
+Docs: [`docs/`](./docs/) · Security: [`docs/security.md`](./docs/security.md) · Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
+
+### Branches
+
+Milestone branches `milestone/m1-foundation` … `milestone/m10-polish` track incremental work; `master` / `dev` hold the merged stack.
 
 ## Quick start
 
@@ -111,14 +115,19 @@ from agent_browser import Browser
 
 async def main():
     async with Browser(headless=True) as browser:
-        page = await browser.open("https://example.com")
-        snap = await page.snapshot()  # semantic roles, stable ids, tree links
-        print(snap.url, snap.title, len(snap.elements))
-        # Semantic find (M2):
-        # btn = await page.find(role="button", text_contains="More")
-        # await page.click(btn.id)
-        # Offline fixture (no network):
-        # page = await browser.set_content("<button id='go'>Go</button>")
+        page = await browser.set_content(
+            "<html><body>"
+            "<label for='q'>Search</label>"
+            "<input id='q' /><button>Go</button>"
+            "</body></html>"
+        )
+        snap = await page.snapshot()
+        q = await page.get_by_label("Search")
+        await page.fill(q.id, "headphones")
+        btn = await page.get_by_role("button", name="Go")
+        await page.click(btn.id)
+        print(await page.context(max_tokens=500, goal="search"))
+        print(await page.plan("search products"))
 
 asyncio.run(main())
 ```
