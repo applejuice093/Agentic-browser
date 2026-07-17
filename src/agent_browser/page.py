@@ -13,7 +13,9 @@ from agent_browser.models.diff import Diff
 from agent_browser.models.element import Element
 from agent_browser.models.events import BrowserEvent, EventType
 from agent_browser.models.snapshot import Snapshot
+from agent_browser.models.vision import OCRRegion, VisionDetection, VisionResult
 from agent_browser.semantic.engine import SemanticDOMEngine
+from agent_browser.vision.engine import VisionEngine
 
 if TYPE_CHECKING:
     from playwright.async_api import Page as PlaywrightPage
@@ -30,6 +32,7 @@ class Page:
     M1: ``open``, ``click``, ``type`` / ``fill``, raw HTML.
     M2: semantic ``snapshot()``, stable IDs, ``find`` / ``find_all``.
     M3: incremental ``diff``, event bus, MutationObserver ``watch``.
+    M4: OCR / vision (``get_text_in_screenshot``, ``detect_ui``).
     """
 
     def __init__(
@@ -47,8 +50,10 @@ class Page:
         self._semantic = SemanticDOMEngine()
         self._events = EventBus()
         self._diff_engine = DiffEngine()
+        self._vision = VisionEngine()
         self._last_snapshot: Snapshot | None = None
         self._last_diff: Diff | None = None
+        self._last_vision: VisionResult | None = None
         self._mutation = MutationMonitor(debounce_ms=100)
         self._auto_snapshot_on_mutation = True
         self._watch_enabled = False
@@ -92,6 +97,16 @@ class Page:
     def last_diff(self) -> Diff | None:
         """Diff from the most recent snapshot vs the previous one."""
         return self._last_diff
+
+    @property
+    def vision(self) -> VisionEngine:
+        """Vision / OCR engine (M4)."""
+        return self._vision
+
+    @property
+    def last_vision(self) -> VisionResult | None:
+        """Result of the most recent vision pass."""
+        return self._last_vision
 
     # --- navigation ---
 
@@ -569,6 +584,140 @@ class Page:
         if path is not None:
             kwargs["path"] = path
         return await self._page.screenshot(**kwargs)
+
+    # --- vision / OCR (M4) ---
+
+    async def get_text_in_screenshot(
+        self,
+        *,
+        region: tuple[float, float, float, float] | None = None,
+        full_page: bool = False,
+        lang: str | None = None,
+        image_bytes: bytes | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        OCR text regions from a page screenshot (design-report API).
+
+        Args:
+            region: Optional ``(x, y, width, height)`` crop in CSS pixels.
+            full_page: Capture full scrollable page when taking a new screenshot.
+            lang: Tesseract language code (default engine lang, usually ``eng``).
+            image_bytes: Reuse an existing PNG/JPEG instead of capturing again.
+
+        Returns:
+            List of ``{x, y, width, height, text, confidence}`` dicts.
+        """
+        self._ensure_open()
+        if image_bytes is None:
+            image_bytes = await self.screenshot(full_page=full_page)
+        regions = await self._vision.get_text_in_screenshot(
+            image_bytes, region=region, lang=lang
+        )
+        self._last_vision = VisionResult(
+            ocr_regions=[OCRRegion.model_validate(r) for r in regions],
+            engine="tesseract",
+        )
+        return regions
+
+    async def ocr(
+        self,
+        *,
+        region: tuple[float, float, float, float] | None = None,
+        full_page: bool = False,
+        lang: str | None = None,
+        image_bytes: bytes | None = None,
+    ) -> list[OCRRegion]:
+        """OCR and return typed :class:`OCRRegion` models."""
+        self._ensure_open()
+        if image_bytes is None:
+            image_bytes = await self.screenshot(full_page=full_page)
+        ocr_regions = await self._vision.ocr.ocr_image(
+            image_bytes, region=region, lang=lang
+        )
+        self._last_vision = VisionResult(ocr_regions=ocr_regions, engine="tesseract")
+        return ocr_regions
+
+    async def ocr_element(
+        self,
+        target: int | Element | str,
+        *,
+        lang: str | None = None,
+    ) -> list[OCRRegion]:
+        """Screenshot a single element and OCR it (canvas/img friendly)."""
+        self._ensure_open()
+        locator = await self._resolve_locator(target)
+        try:
+            image_bytes = await locator.screenshot(type="png")
+        except Exception as exc:
+            raise ElementNotFoundError(
+                f"ocr_element screenshot failed for {target!r}: {exc}"
+            ) from exc
+        return await self.ocr(image_bytes=image_bytes, lang=lang)
+
+    async def ocr_text(
+        self,
+        *,
+        region: tuple[float, float, float, float] | None = None,
+        full_page: bool = False,
+        lang: str | None = None,
+        image_bytes: bytes | None = None,
+        separator: str = " ",
+    ) -> str:
+        """Convenience: joined plain text from OCR regions."""
+        regions = await self.ocr(
+            region=region,
+            full_page=full_page,
+            lang=lang,
+            image_bytes=image_bytes,
+        )
+        return self._vision.ocr.join_text(regions, separator=separator)
+
+    async def detect_ui(
+        self,
+        *,
+        full_page: bool = False,
+        image_bytes: bytes | None = None,
+    ) -> list[VisionDetection]:
+        """
+        Optional UI detection hook over a screenshot.
+
+        Default engine is a lightweight heuristic (not a trained detector).
+        """
+        self._ensure_open()
+        if image_bytes is None:
+            image_bytes = await self.screenshot(full_page=full_page)
+        detections = await self._vision.detector.detect(image_bytes)
+        prev = self._last_vision
+        self._last_vision = VisionResult(
+            ocr_regions=list(prev.ocr_regions) if prev else [],
+            detections=detections,
+            engine="heuristic" if not prev else f"{prev.engine}+heuristic",
+        )
+        return detections
+
+    async def analyze_vision(
+        self,
+        *,
+        region: tuple[float, float, float, float] | None = None,
+        full_page: bool = False,
+        run_ocr: bool = True,
+        run_detect: bool = False,
+        lang: str | None = None,
+        image_bytes: bytes | None = None,
+    ) -> VisionResult:
+        """Combined OCR (+ optional UI detection) pass."""
+        self._ensure_open()
+        if image_bytes is None:
+            image_bytes = await self.screenshot(full_page=full_page)
+        result = await self._vision.analyze(
+            image_bytes,
+            region=region,
+            run_ocr=run_ocr,
+            run_detect=run_detect,
+            lang=lang,
+        )
+        self._last_vision = result
+        return result
 
     async def close(self) -> None:
         if self._closed:

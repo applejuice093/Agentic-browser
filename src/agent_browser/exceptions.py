@@ -29,3 +29,7 @@ class SnapshotError(AgentBrowserError):
 
 class TimeoutError(AgentBrowserError):
     """Raised when an operation exceeds the configured timeout."""
+
+
+class VisionError(AgentBrowserError):
+    """Raised when OCR/vision fails or dependencies are missing."""

@@ -36,9 +36,9 @@ Each milestone has a **git branch**. Work on the branch for the active milestone
 - [x] Optional MutationObserver path
 
 ### M4 — Vision
-- [ ] Local OCR on screenshot regions
-- [ ] `get_text_in_screenshot` API
-- [ ] Optional UI detection hooks
+- [x] Local OCR on screenshot regions
+- [x] `get_text_in_screenshot` API
+- [x] Optional UI detection hooks
 
 ### M5 — Network
 - [ ] Request log + filter
