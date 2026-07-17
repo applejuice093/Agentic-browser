@@ -180,6 +180,22 @@ class Browser:
         session = MultiAgentSession(session_id=self.session_id, browser=self)
         return session
 
+    async def open_agent(
+        self,
+        url: str | None = None,
+        *,
+        detail: str = "normal",
+        max_tokens: int = 2000,
+    ) -> Any:
+        """
+        Open a page (optional URL) and return an AgentSession for LLM tool use.
+        """
+        if url:
+            page = await self.open(url)
+        else:
+            page = await self.new_page()
+        return page.as_agent(detail=detail, max_tokens=max_tokens)
+
     async def __aenter__(self) -> Self:
         return await self.start()
 

@@ -54,6 +54,7 @@ class Page:
     M6: ``get_by_role`` / ``get_by_label`` accessibility finders.
     M7: session memory, ``context()``, ``plan(goal)``.
     M8: optional humanized mouse/keyboard input.
+    Agent-native: :meth:`as_agent` → compact observe/act loop for LLMs.
     """
 
     def __init__(
@@ -1080,6 +1081,38 @@ class Page:
         )
         self._last_vision = result
         return result
+
+    def as_agent(
+        self,
+        *,
+        detail: str = "normal",
+        max_tokens: int = 2000,
+        observe_after_action: bool = True,
+    ) -> Any:
+        """
+        Return an :class:`~agent_browser.agent.AgentSession` bound to this page.
+
+        Preferred entrypoint for LLM tool loops (compact observations + ActionResult).
+        """
+        from agent_browser.agent.session import AgentSession
+
+        return AgentSession(
+            self,
+            default_detail=detail,
+            max_tokens=max_tokens,
+            observe_after_action=observe_after_action,
+        )
+
+    async def observe(
+        self,
+        *,
+        detail: str = "normal",
+        max_tokens: int = 2000,
+        include_diff: bool = True,
+    ) -> Any:
+        """Shortcut: compact LLM observation of the current page."""
+        agent = self.as_agent(detail=detail, max_tokens=max_tokens)
+        return await agent.observe(include_diff=include_diff)
 
     async def close(self) -> None:
         if self._closed:

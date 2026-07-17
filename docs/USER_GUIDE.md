@@ -414,7 +414,34 @@ Design source: [`../deep-research-report.md`](../deep-research-report.md)
 
 ---
 
-## 18. Scraping data with the agent browser
+## 18. LLM agent loop (recommended)
+
+Prefer **AgentSession** over dumping HTML or full snapshots into the model:
+
+```python
+from agent_browser import Browser, tools_as_openai
+
+async with Browser(headless=True) as browser:
+    agent = await browser.open_agent("https://example.com", max_tokens=2000)
+    obs = await agent.observe(detail="normal")
+    # obs.interactive = [{ref, role, name, text, href}, ...]
+
+    result = await agent.click(some_ref)
+    if not result.ok:
+        print(result.error_code, result.error_message)
+        await agent.resync()
+
+    await agent.type(email_ref, "a@b.c", clear=True)
+    await agent.wait("networkidle")
+
+    # Bind tools to your LLM
+    tools = tools_as_openai()
+    await agent.call_tool("browser_find", {"role": "button", "text": "Next"})
+```
+
+Details: [`agent-native-loop.md`](./agent-native-loop.md).
+
+## 19. Scraping data with the agent browser
 
 This product is an **agent browser**, not a classic HTML parser. Prefer:
 
@@ -449,13 +476,15 @@ then exports JSON for agents or pipelines.
 **Legal note:** only scrape sites you are allowed to access; respect robots.txt
 and terms of service. Prefer user-owned sessions for authenticated data.
 
-## 19. Examples
+## 20. Examples
 
 ```bash
+python examples/agent_loop_demo.py
 python examples/basic_open.py
 python examples/semantic_find.py
 python examples/events_diff.py
 python examples/vision_ocr.py
 python examples/network_api.py
 python examples/agent_scrape.py --pages 2
+python examples/compare_scrape_methods.py --pages 1
 ```

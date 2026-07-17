@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0 — Agent-native observation loop
+
+### Added
+
+- **AgentSession** — `observe` / `click` / `type` / `wait` / `resync` / `call_tool`
+- **Observation** + **ActionResult** schemas (versioned, compact, error codes)
+- Token-budgeted compact builder (`sparse` | `normal` | `full`)
+- Diff + network hints on each observation
+- OpenAI-style tool definitions (`tools_as_openai()`)
+- `page.as_agent()`, `browser.open_agent()`, `page.observe()`
+- Docs: `docs/agent-native-loop.md`, example `examples/agent_loop_demo.py`
+
 ## 0.2.1 — M5 network intelligence
 
 ### Added

@@ -75,7 +75,17 @@ Python Agent Browser API
 | M9 | Done | Multi-agent sessions |
 | M10 | Done | Docs, security, polish |
 
-**User guide:** [`docs/USER_GUIDE.md`](./docs/USER_GUIDE.md) · Docs: [`docs/`](./docs/) · Security: [`docs/security.md`](./docs/security.md) · Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
+**User guide:** [`docs/USER_GUIDE.md`](./docs/USER_GUIDE.md) · **Agent loop:** [`docs/agent-native-loop.md`](./docs/agent-native-loop.md) · Security: [`docs/security.md`](./docs/security.md) · Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
+
+### LLM agent loop (v0.3)
+
+```python
+async with Browser() as browser:
+    agent = await browser.open_agent("https://example.com")
+    obs = await agent.observe(max_tokens=1500)   # compact refs, not full HTML
+    result = await agent.click(obs.interactive[0].ref)
+    # result.ok, result.error_code, result.observation
+```
 
 ### Branches
 
