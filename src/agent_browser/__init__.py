@@ -7,6 +7,7 @@ stable element IDs, accessibility-aware snapshots, diffs, and high-level actions
 
 from agent_browser.browser import Browser
 from agent_browser.config import BrowserConfig
+from agent_browser.events import DiffEngine, EventBus
 from agent_browser.exceptions import (
     AgentBrowserError,
     BrowserNotStartedError,
@@ -14,8 +15,9 @@ from agent_browser.exceptions import (
     NavigationError,
     SnapshotError,
 )
+from agent_browser.models.diff import Diff
 from agent_browser.models.element import BoundingBox, Element
-from agent_browser.models.events import BrowserEvent
+from agent_browser.models.events import BrowserEvent, EventType
 from agent_browser.models.snapshot import Snapshot
 from agent_browser.page import Page
 from agent_browser.semantic import SemanticDOMEngine, StableIDAssigner
@@ -28,7 +30,11 @@ __all__ = [
     "Element",
     "BoundingBox",
     "Snapshot",
+    "Diff",
     "BrowserEvent",
+    "EventType",
+    "EventBus",
+    "DiffEngine",
     "BrowserConfig",
     "SemanticDOMEngine",
     "StableIDAssigner",

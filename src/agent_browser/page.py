@@ -1,12 +1,17 @@
-"""Page API: navigation, actions, and semantic snapshots (M1 + M2)."""
+"""Page API: navigation, actions, semantic snapshots, diffs & events (M1–M3)."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal
 
+from agent_browser.events.bus import EventBus, EventHandler
+from agent_browser.events.diffing import DiffEngine
+from agent_browser.events.monitor import MutationMonitor
 from agent_browser.exceptions import ElementNotFoundError, NavigationError, SnapshotError
+from agent_browser.models.diff import Diff
 from agent_browser.models.element import Element
+from agent_browser.models.events import BrowserEvent, EventType
 from agent_browser.models.snapshot import Snapshot
 from agent_browser.semantic.engine import SemanticDOMEngine
 
@@ -23,7 +28,8 @@ class Page:
     High-level page handle for agents.
 
     M1: ``open``, ``click``, ``type`` / ``fill``, raw HTML.
-    M2: semantic ``snapshot()``, stable IDs across updates, ``find`` / ``find_all``.
+    M2: semantic ``snapshot()``, stable IDs, ``find`` / ``find_all``.
+    M3: incremental ``diff``, event bus, MutationObserver ``watch``.
     """
 
     def __init__(
@@ -39,6 +45,17 @@ class Page:
         self._closed = False
         self._element_registry: dict[int, Element] = {}
         self._semantic = SemanticDOMEngine()
+        self._events = EventBus()
+        self._diff_engine = DiffEngine()
+        self._last_snapshot: Snapshot | None = None
+        self._last_diff: Diff | None = None
+        self._mutation = MutationMonitor(debounce_ms=100)
+        self._auto_snapshot_on_mutation = True
+        self._watch_enabled = False
+        self._nav_from_url: str | None = None
+
+        # Playwright navigation hook
+        self._page.on("framenavigated", self._on_frame_navigated)
 
     # --- properties ---
 
@@ -62,6 +79,20 @@ class Page:
         """Access the semantic DOM engine for advanced queries."""
         return self._semantic
 
+    @property
+    def events(self) -> EventBus:
+        """Page event bus (M3)."""
+        return self._events
+
+    @property
+    def last_snapshot(self) -> Snapshot | None:
+        return self._last_snapshot
+
+    @property
+    def last_diff(self) -> Diff | None:
+        """Diff from the most recent snapshot vs the previous one."""
+        return self._last_diff
+
     # --- navigation ---
 
     async def open(self, url: str, *, wait_until: WaitUntil = "domcontentloaded") -> None:
@@ -71,11 +102,23 @@ class Page:
     async def goto(self, url: str, *, wait_until: WaitUntil = "domcontentloaded") -> None:
         """Navigate to a URL."""
         self._ensure_open()
+        from_url = self._page.url
+        self._nav_from_url = from_url
         try:
             await self._page.goto(url, wait_until=wait_until)
         except Exception as exc:
             raise NavigationError(f"Navigation to {url!r} failed: {exc}") from exc
         self._on_document_reset()
+        await self._events.emit(
+            BrowserEvent.make(
+                EventType.NAVIGATION,
+                from_url=from_url,
+                to_url=self._page.url,
+                via="goto",
+            )
+        )
+        if self._watch_enabled:
+            await self._reattach_mutation_observer()
 
     async def set_content(
         self,
@@ -85,29 +128,73 @@ class Page:
     ) -> None:
         """Load inline HTML into the page (no network)."""
         self._ensure_open()
+        from_url = self._page.url
         try:
             await self._page.set_content(html, wait_until=wait_until)
         except Exception as exc:
             raise NavigationError(f"set_content failed: {exc}") from exc
         self._on_document_reset()
+        await self._events.emit(
+            BrowserEvent.make(
+                EventType.NAVIGATION,
+                from_url=from_url,
+                to_url=self._page.url,
+                via="set_content",
+            )
+        )
+        if self._watch_enabled:
+            await self._reattach_mutation_observer()
 
     async def reload(self, *, wait_until: WaitUntil = "domcontentloaded") -> None:
         self._ensure_open()
+        from_url = self._page.url
         try:
             await self._page.reload(wait_until=wait_until)
         except Exception as exc:
             raise NavigationError(f"Reload failed: {exc}") from exc
         self._on_document_reset()
+        await self._events.emit(
+            BrowserEvent.make(
+                EventType.NAVIGATION,
+                from_url=from_url,
+                to_url=self._page.url,
+                via="reload",
+            )
+        )
+        if self._watch_enabled:
+            await self._reattach_mutation_observer()
 
     async def go_back(self, *, wait_until: WaitUntil = "domcontentloaded") -> None:
         self._ensure_open()
+        from_url = self._page.url
         await self._page.go_back(wait_until=wait_until)
         self._on_document_reset()
+        await self._events.emit(
+            BrowserEvent.make(
+                EventType.NAVIGATION,
+                from_url=from_url,
+                to_url=self._page.url,
+                via="back",
+            )
+        )
+        if self._watch_enabled:
+            await self._reattach_mutation_observer()
 
     async def go_forward(self, *, wait_until: WaitUntil = "domcontentloaded") -> None:
         self._ensure_open()
+        from_url = self._page.url
         await self._page.go_forward(wait_until=wait_until)
         self._on_document_reset()
+        await self._events.emit(
+            BrowserEvent.make(
+                EventType.NAVIGATION,
+                from_url=from_url,
+                to_url=self._page.url,
+                via="forward",
+            )
+        )
+        if self._watch_enabled:
+            await self._reattach_mutation_observer()
 
     # --- actions ---
 
@@ -133,6 +220,12 @@ class Page:
             await locator.click(**kwargs)
         except Exception as exc:
             raise ElementNotFoundError(f"Click failed for target {target!r}: {exc}") from exc
+        await self._events.emit(
+            BrowserEvent.make(
+                EventType.ELEMENT_CLICKED,
+                target=self._target_meta(target),
+            )
+        )
 
     async def type(
         self,
@@ -165,6 +258,13 @@ class Page:
                 await locator.type(text, **kwargs)
         except Exception as exc:
             raise ElementNotFoundError(f"Type failed for target {target!r}: {exc}") from exc
+        await self._events.emit(
+            BrowserEvent.make(
+                EventType.ELEMENT_TYPED,
+                target=self._target_meta(target),
+                length=len(text),
+            )
+        )
 
     async def fill(
         self,
@@ -182,6 +282,13 @@ class Page:
             await locator.fill(text, **kwargs)
         except Exception as exc:
             raise ElementNotFoundError(f"Fill failed for target {target!r}: {exc}") from exc
+        await self._events.emit(
+            BrowserEvent.make(
+                EventType.ELEMENT_FILLED,
+                target=self._target_meta(target),
+                length=len(text),
+            )
+        )
 
     async def press(
         self,
@@ -224,12 +331,13 @@ class Page:
         *,
         include_raw_html: bool = False,
         merge_accessibility: bool = True,
+        emit_events: bool = True,
     ) -> Snapshot:
         """
         Capture a semantic page snapshot.
 
-        Includes role/name, stable ids, parent/child links, and optional raw HTML.
-        IDs remain stable across in-page updates until the next navigation.
+        When a previous snapshot exists, computes an incremental :class:`Diff`
+        (available as :attr:`last_diff`) and optionally emits fine-grained events.
         """
         self._ensure_open()
         try:
@@ -249,8 +357,100 @@ class Page:
         except Exception as exc:
             raise SnapshotError(f"Failed to capture snapshot: {exc}") from exc
 
+        previous = self._last_snapshot
         self._element_registry = {el.id: el for el in snap.elements}
+        self._last_snapshot = snap
+
+        if previous is not None:
+            diff = self._diff_engine.diff(previous, snap)
+            self._last_diff = diff
+            if emit_events and not diff.is_empty:
+                await self._events.emit_many(self._diff_engine.to_events(diff))
+        else:
+            self._last_diff = Diff(
+                current_url=snap.url,
+                previous_url=None,
+            )
+            if emit_events:
+                await self._events.emit(
+                    BrowserEvent.make(
+                        EventType.SNAPSHOT,
+                        url=snap.url,
+                        title=snap.title,
+                        element_count=len(snap.elements),
+                    )
+                )
+
         return snap
+
+    def diff_snapshots(self, previous: Snapshot, current: Snapshot) -> Diff:
+        """Compute a diff between two snapshots without side effects."""
+        return self._diff_engine.diff(previous, current)
+
+    async def refresh_diff(self, *, emit_events: bool = True) -> Diff:
+        """Take a new snapshot and return the diff vs the previous one."""
+        await self.snapshot(emit_events=emit_events)
+        return self._last_diff or Diff()
+
+    # --- events / watch (M3) ---
+
+    def on(self, handler: EventHandler) -> Callable[[], None]:
+        """Subscribe to all page events; returns unsubscribe callable."""
+        return self._events.subscribe(handler)
+
+    def on_event(
+        self,
+        event_type: EventType | str,
+        handler: EventHandler,
+    ) -> Callable[[], None]:
+        """Subscribe to a single event type."""
+        key = event_type.value if isinstance(event_type, EventType) else event_type
+
+        def _wrapped(event: BrowserEvent) -> Any:
+            ev = event.event.value if isinstance(event.event, EventType) else event.event
+            if ev == key:
+                return handler(event)
+            return None
+
+        return self._events.subscribe(_wrapped)
+
+    async def wait_for_event(
+        self,
+        event_type: EventType | str,
+        *,
+        timeout: float | None = 30.0,
+    ) -> BrowserEvent:
+        """Wait until an event of the given type is emitted."""
+        return await self._events.wait_for(event_type, timeout=timeout)
+
+    async def watch(
+        self,
+        *,
+        enabled: bool = True,
+        debounce_ms: int = 100,
+        auto_snapshot: bool = True,
+    ) -> None:
+        """
+        Enable or disable MutationObserver-based live updates.
+
+        When enabled, DOM mutations emit ``mutation`` events and (if
+        ``auto_snapshot``) a follow-up semantic snapshot + diff stream.
+        """
+        self._ensure_open()
+        self._auto_snapshot_on_mutation = auto_snapshot
+        self._mutation.debounce_ms = debounce_ms
+
+        if not enabled:
+            await self._mutation.detach()
+            self._watch_enabled = False
+            return
+
+        await self._mutation.attach(self._page, on_mutation=self._handle_mutation)
+        self._watch_enabled = True
+
+    @property
+    def is_watching(self) -> bool:
+        return self._watch_enabled and self._mutation.is_attached
 
     async def find(
         self,
@@ -377,6 +577,14 @@ class Page:
         self._element_registry.clear()
         self._semantic.reset()
         try:
+            await self._mutation.detach()
+        except Exception:
+            pass
+        try:
+            await self._events.close()
+        except Exception:
+            pass
+        try:
             await self._page.close()
         except Exception:
             pass
@@ -389,10 +597,97 @@ class Page:
         """Navigation/document replacement invalidates identity maps."""
         self._element_registry.clear()
         self._semantic.reset()
+        # Keep last_snapshot for navigation diffing? Clear so next snapshot is baseline.
+        self._last_snapshot = None
+        self._last_diff = None
+
+    def _on_frame_navigated(self, frame: Any) -> None:
+        # Only top-level frame; emission also done in goto/set_content for clarity
+        try:
+            if frame == self._page.main_frame:
+                pass
+        except Exception:
+            pass
+
+    async def _handle_mutation(self, payload: dict[str, Any]) -> None:
+        await self._events.emit(self._mutation.mutation_event(payload))
+        if self._auto_snapshot_on_mutation and not self._closed:
+            try:
+                await self.snapshot(emit_events=True)
+            except Exception as exc:
+                await self._events.emit(
+                    BrowserEvent.make(EventType.ERROR, where="mutation_snapshot", error=str(exc))
+                )
+
+    async def _reattach_mutation_observer(self) -> None:
+        # After navigation the observer is gone; re-inject script.
+        # Binding remains on the page context.
+        try:
+            await self._page.evaluate(
+                "() => { if (window.__agentBrowserMO) { window.__agentBrowserMO.disconnect(); delete window.__agentBrowserMO; } }"
+            )
+            await self._page.evaluate(
+                # reuse monitor JS via attach path
+                """
+                (debounceMs) => {
+                  let timer = null;
+                  let batch = { childList: 0, attributes: 0, characterData: 0 };
+                  const flush = () => {
+                    timer = null;
+                    const payload = {
+                      childList: batch.childList,
+                      attributes: batch.attributes,
+                      characterData: batch.characterData,
+                      ts: Date.now(),
+                    };
+                    batch = { childList: 0, attributes: 0, characterData: 0 };
+                    if (window.__agentBrowserNotify) {
+                      window.__agentBrowserNotify(payload);
+                    }
+                  };
+                  const mo = new MutationObserver((mutations) => {
+                    for (const m of mutations) {
+                      if (m.type === 'childList') batch.childList += 1;
+                      else if (m.type === 'attributes') {
+                        if (m.attributeName === 'data-agent-id') continue;
+                        batch.attributes += 1;
+                      } else if (m.type === 'characterData') batch.characterData += 1;
+                    }
+                    if (batch.childList || batch.attributes || batch.characterData) {
+                      if (timer) clearTimeout(timer);
+                      timer = setTimeout(flush, debounceMs);
+                    }
+                  });
+                  const root = document.documentElement || document.body;
+                  if (root) {
+                    mo.observe(root, {
+                      childList: true,
+                      subtree: true,
+                      attributes: true,
+                      characterData: true,
+                    });
+                  }
+                  window.__agentBrowserMO = mo;
+                  return true;
+                }
+                """,
+                self._mutation.debounce_ms,
+            )
+            self._mutation._attached = True  # noqa: SLF001
+        except Exception:
+            self._watch_enabled = False
 
     def _ensure_open(self) -> None:
         if self._closed:
             raise RuntimeError("Page is closed")
+
+    @staticmethod
+    def _target_meta(target: int | Element | str) -> Any:
+        if isinstance(target, Element):
+            return {"id": target.id, "role": target.role, "text": target.text}
+        if isinstance(target, int):
+            return {"id": target}
+        return {"selector": target}
 
     async def _resolve_locator(self, target: int | Element | str) -> Any:
         self._ensure_open()

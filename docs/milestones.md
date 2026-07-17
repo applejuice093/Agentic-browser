@@ -31,9 +31,9 @@ Each milestone has a **git branch**. Work on the branch for the active milestone
 - [x] Layout noise filtered from tree
 
 ### M3 — Diffs & events
-- [ ] `Diff` between snapshots
-- [ ] Event bus: navigation, element_added/removed, etc.
-- [ ] Optional MutationObserver path
+- [x] `Diff` between snapshots
+- [x] Event bus: navigation, element_added/removed, etc.
+- [x] Optional MutationObserver path
 
 ### M4 — Vision
 - [ ] Local OCR on screenshot regions
