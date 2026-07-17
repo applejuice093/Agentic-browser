@@ -41,9 +41,9 @@ Each milestone has a **git branch**. Work on the branch for the active milestone
 - [x] Optional UI detection hooks
 
 ### M5 — Network
-- [ ] Request log + filter
-- [ ] `wait_for_api`
-- [ ] GraphQL detection basics
+- [x] Request log + filter
+- [x] `wait_for_api`
+- [x] GraphQL detection basics
 
 ### M6 — Accessibility polish
 - [x] `get_by_role` / `get_by_label` style finders
@@ -67,5 +67,4 @@ Each milestone has a **git branch**. Work on the branch for the active milestone
 - [x] Performance pass
 - [x] Security review notes
 
-### Deferred
-- **M5** Network/API introspection — scaffold in `network/`; implement on `milestone/m5-network`
+

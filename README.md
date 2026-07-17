@@ -68,14 +68,14 @@ Python Agent Browser API
 | M2 | Done | Semantic DOM + stable IDs |
 | M3 | Done | Diffs + event streaming |
 | M4 | Done | OCR / vision hooks |
-| M5 | Deferred | Network/API (scaffold only) |
+| M5 | Done | Network capture, wait_for_api, GraphQL |
 | M6 | Done | `get_by_role` / `get_by_label` |
 | M7 | Done | Memory, context, plan |
 | M8 | Done | Humanized input |
 | M9 | Done | Multi-agent sessions |
 | M10 | Done | Docs, security, polish |
 
-Docs: [`docs/`](./docs/) · Security: [`docs/security.md`](./docs/security.md) · Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
+**User guide:** [`docs/USER_GUIDE.md`](./docs/USER_GUIDE.md) · Docs: [`docs/`](./docs/) · Security: [`docs/security.md`](./docs/security.md) · Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
 
 ### Branches
 

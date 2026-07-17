@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 — M5 network intelligence
+
+### Added
+
+- **M5** Network capture, `wait_for_api`, GraphQL detection, `route` helper
+- Full **User Guide** (`docs/USER_GUIDE.md`)
+
 ## 0.2.0 — M1–M10 foundation stack
 
 ### Added
@@ -13,7 +20,3 @@
 - **M8** Humanized mouse paths and typing delays
 - **M9** Multi-agent sessions with per-agent subscriptions
 - **M10** Docs index, security notes, performance guidance
-
-### Deferred
-
-- **M5** Network/API intelligence (module scaffold only)

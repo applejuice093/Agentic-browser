@@ -33,3 +33,7 @@ class TimeoutError(AgentBrowserError):
 
 class VisionError(AgentBrowserError):
     """Raised when OCR/vision fails or dependencies are missing."""
+
+
+class NetworkTimeoutError(TimeoutError):
+    """Raised when wait_for_api exceeds its timeout."""

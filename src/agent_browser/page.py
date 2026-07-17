@@ -25,8 +25,10 @@ from agent_browser.models.diff import Diff
 from agent_browser.models.element import Element
 from agent_browser.models.events import BrowserEvent, EventType
 from agent_browser.models.snapshot import Snapshot
+from agent_browser.models.network import NetworkRequest
 from agent_browser.models.vision import OCRRegion, VisionDetection, VisionResult
 from agent_browser.memory.store import MemoryStore
+from agent_browser.network.monitor import NetworkMonitor
 from agent_browser.planning.context import ContextBuilder
 from agent_browser.planning.planner import Planner
 from agent_browser.semantic.engine import SemanticDOMEngine
@@ -48,6 +50,7 @@ class Page:
     M2: semantic ``snapshot()``, stable IDs, ``find`` / ``find_all``.
     M3: incremental ``diff``, event bus, MutationObserver ``watch``.
     M4: OCR / vision (``get_text_in_screenshot``, ``detect_ui``).
+    M5: network capture, ``wait_for_api``, GraphQL detection.
     M6: ``get_by_role`` / ``get_by_label`` accessibility finders.
     M7: session memory, ``context()``, ``plan(goal)``.
     M8: optional humanized mouse/keyboard input.
@@ -61,6 +64,7 @@ class Page:
         on_close: Callable[[Page], None] | None = None,
         memory: MemoryStore | None = None,
         humanize: HumanizedInput | bool | None = None,
+        network: NetworkMonitor | None = None,
     ) -> None:
         self._page = pw_page
         self.config = config
@@ -71,6 +75,7 @@ class Page:
         self._events = EventBus()
         self._diff_engine = DiffEngine()
         self._vision = VisionEngine()
+        self._network = network or NetworkMonitor()
         self._memory = memory or MemoryStore()
         self._context_builder = ContextBuilder()
         self._planner = Planner()
@@ -95,6 +100,7 @@ class Page:
         self._watch_enabled = False
         self._nav_from_url: str | None = None
         self._mouse_pos = Point(0, 0)
+        self._network_ready = False
 
         # Playwright navigation hook
         self._page.on("framenavigated", self._on_frame_navigated)
@@ -155,8 +161,20 @@ class Page:
         """Humanized input controller (M8)."""
         return self._humanize
 
+    @property
+    def network(self) -> NetworkMonitor:
+        """Network monitor (M5)."""
+        return self._network
+
     def set_humanize(self, enabled: bool) -> None:
         self._humanize.enabled = enabled
+
+    async def _ensure_network(self) -> None:
+        if self._network_ready:
+            return
+        self._network.set_event_emitter(self._events.emit)
+        await self._network.attach(self._page)
+        self._network_ready = True
 
     # --- navigation ---
 
@@ -167,6 +185,7 @@ class Page:
     async def goto(self, url: str, *, wait_until: WaitUntil = "domcontentloaded") -> None:
         """Navigate to a URL."""
         self._ensure_open()
+        await self._ensure_network()
         from_url = self._page.url
         self._nav_from_url = from_url
         try:
@@ -195,6 +214,7 @@ class Page:
     ) -> None:
         """Load inline HTML into the page (no network)."""
         self._ensure_open()
+        await self._ensure_network()
         from_url = self._page.url
         try:
             await self._page.set_content(html, wait_until=wait_until)
@@ -854,6 +874,120 @@ class Page:
             image_bytes=image_bytes,
         )
         return self._vision.ocr.join_text(regions, separator=separator)
+
+    # --- network intelligence (M5) ---
+
+    def network_requests(
+        self,
+        *,
+        filter: str | None = None,  # noqa: A002
+        method: str | None = None,
+        status: int | None = None,
+        graphql_only: bool = False,
+        failed_only: bool = False,
+    ) -> list[dict[str, Any]]:
+        """
+        Return captured network request summaries.
+
+        ``filter`` is a substring, glob (``*/api/*``), or ``re:`` regex.
+        """
+        return self._network.network_requests(
+            filter=filter,
+            method=method,
+            status=status,
+            graphql_only=graphql_only,
+            failed_only=failed_only,
+        )
+
+    def list_network_requests(
+        self,
+        *,
+        filter: str | None = None,  # noqa: A002
+        method: str | None = None,
+        status: int | None = None,
+        graphql_only: bool = False,
+        failed_only: bool = False,
+    ) -> list[NetworkRequest]:
+        """Full :class:`NetworkRequest` models (includes bodies when captured)."""
+        return self._network.list_requests(
+            filter=filter,
+            method=method,
+            status=status,
+            graphql_only=graphql_only,
+            failed_only=failed_only,
+        )
+
+    async def wait_for_api(
+        self,
+        url_pattern: str,
+        *,
+        timeout_ms: int = 30_000,
+        method: str | None = None,
+        status: int | None = None,
+    ) -> NetworkRequest:
+        """Block until a matching XHR/fetch/API response is observed."""
+        self._ensure_open()
+        await self._ensure_network()
+        return await self._network.wait_for_api(
+            url_pattern,
+            timeout_ms=timeout_ms,
+            method=method,
+            status=status,
+        )
+
+    def clear_network_log(self) -> None:
+        """Clear captured requests for this page."""
+        self._network.clear()
+
+    async def route(
+        self,
+        url_pattern: str,
+        handler: Callable[[Any], Any] | None = None,
+        *,
+        fulfill_json: Any | None = None,
+        status: int = 200,
+    ) -> None:
+        """
+        Intercept requests matching ``url_pattern`` (Playwright glob).
+
+        Provide either a custom ``handler(route)`` or ``fulfill_json`` for a
+        static JSON response (handy for tests and offline agents).
+        """
+        self._ensure_open()
+        await self._ensure_network()
+
+        if handler is not None:
+            await self._page.route(url_pattern, handler)
+            return
+
+        if fulfill_json is not None:
+            import json as _json
+
+            body = _json.dumps(fulfill_json)
+
+            async def _fulfill(route: Any) -> None:
+                await route.fulfill(
+                    status=status,
+                    content_type="application/json",
+                    body=body,
+                )
+
+            await self._page.route(url_pattern, _fulfill)
+            return
+
+        raise ValueError("route() requires handler= or fulfill_json=")
+
+    async def unroute(self, url_pattern: str) -> None:
+        self._ensure_open()
+        await self._page.unroute(url_pattern)
+
+    async def wait_for_network_idle(self, *, timeout_ms: float | None = None) -> None:
+        """Wait until Playwright reports networkidle."""
+        self._ensure_open()
+        kwargs: dict[str, Any] = {}
+        if timeout_ms is not None:
+            kwargs["timeout"] = timeout_ms
+        await self._page.wait_for_load_state("networkidle", **kwargs)
 
     # --- memory / planning (M7) ---
 

@@ -13,6 +13,7 @@ from agent_browser.exceptions import (
     BrowserNotStartedError,
     ElementNotFoundError,
     NavigationError,
+    NetworkTimeoutError,
     SnapshotError,
     VisionError,
 )
@@ -20,7 +21,9 @@ from agent_browser.models.diff import Diff
 from agent_browser.models.element import BoundingBox, Element
 from agent_browser.models.events import BrowserEvent, EventType
 from agent_browser.models.snapshot import Snapshot
+from agent_browser.models.network import NetworkRequest
 from agent_browser.models.vision import OCRRegion, VisionDetection, VisionResult
+from agent_browser.network import NetworkMonitor
 from agent_browser.page import Page
 from agent_browser.semantic import SemanticDOMEngine, StableIDAssigner
 from agent_browser.memory import MemoryStore
@@ -28,7 +31,7 @@ from agent_browser.multiagent import AgentHandle, MultiAgentSession
 from agent_browser.planning import ContextBuilder, Planner
 from agent_browser.vision import OCREngine, UIDetector, VisionDependencyError, VisionEngine
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 __all__ = [
     "Browser",
@@ -52,6 +55,8 @@ __all__ = [
     "VisionResult",
     "VisionDependencyError",
     "VisionError",
+    "NetworkMonitor",
+    "NetworkRequest",
     "MemoryStore",
     "ContextBuilder",
     "Planner",
@@ -61,6 +66,7 @@ __all__ = [
     "BrowserNotStartedError",
     "ElementNotFoundError",
     "NavigationError",
+    "NetworkTimeoutError",
     "SnapshotError",
     "__version__",
 ]

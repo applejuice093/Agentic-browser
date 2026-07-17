@@ -26,7 +26,7 @@
 | [architecture.md](./architecture.md) | Architecture map |
 | [milestones.md](./milestones.md) | Roadmap checklist |
 
-> **M5 (Network intelligence)** was deferred in this push sequence; scaffold remains under `src/agent_browser/network/`.
+> **M5 (Network intelligence)** is implemented — see [m5-network.md](./m5-network.md) and the [User Guide](./USER_GUIDE.md).
 
 ## Performance notes
 
