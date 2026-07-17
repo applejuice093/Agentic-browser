@@ -1,23 +1,31 @@
-# Agent-native observation loop (v0.3.1)
+# Agent-native observation loop (v0.3.2)
 
-**Branch:** `feature/agent-native-loop` · merged into `dev`
+**Branch:** `dev`
 
 ## Why
 
 LLM agents need **cheap, stable, actionable** observations — not full HTML or fat DOM dumps.
-Marketing SPAs also need **overlay dismissal** and **settled hydration** before the first look.
+Marketing SPAs need **overlay dismissal** and **settled hydration**. Dense sites (GitHub) need
+**scoped grounding** and **outcome verification** so “ok” means the task succeeded.
+
+Research touchstones: BrowserGym action errors + AX grounding; dual grounding / exact labels;
+web-agent surveys on environment dynamics and blocked states (detect, don’t hallucinate content).
 
 ## Systems (bottleneck workarounds)
 
 | Bottleneck | System |
 |------------|--------|
-| Cookie / CMP / privacy walls | `overlays.dismiss_overlays` (selectors + role + JS + hide fallback) |
-| SPA hang on `networkidle` | `settle.settle_page` budgeted wait (domcontentloaded → capped networkidle) |
-| Lazy content below fold | optional scroll probe during prepare |
-| Noisy CMP headings | `is_noise_text` filter in compact observation |
-| Fat HTML / fat trees | token-budgeted `build_observation` + `summary` field |
-| Stale refs after re-render | auto resync + optional `text_hint` re-find on click/type |
-| Analytics spam in network | filter sentry/gtm/onetrust from observation network hints |
+| Cookie / CMP / privacy walls | `overlays.dismiss_overlays` |
+| SPA hang on `networkidle` | `settle.settle_page` budgeted wait |
+| Lazy content below fold | scroll probe during prepare |
+| Noisy CMP headings | `is_noise_text` filter |
+| Fat HTML / fat trees | token-budgeted `build_observation` + `summary` |
+| Stale refs after re-render | resync + `text_hint` re-find |
+| Analytics spam in network | filter sentry/gtm/onetrust |
+| False-positive clicks | **outcome verification** (`outcome.py`) |
+| Wrong element (PR body “issues”) | **scoped grounding** `scope=nav` (`grounding.py`) |
+| Bot walls / JS challenges | **page_gate** classifier (`challenge.py`) — no bypass |
+| GitHub tab navigation | **skill**: direct `/issues` `/pulls` URLs |
 
 ## API
 
@@ -25,18 +33,17 @@ Marketing SPAs also need **overlay dismissal** and **settled hydration** before 
 from agent_browser import Browser, tools_as_openai
 
 async with Browser() as browser:
-    # prepare() runs automatically: settle + dismiss cookies
-    agent = await browser.open_agent("https://www.rockstargames.com/VI")
+    agent = await browser.open_agent("https://github.com/vercel/next.js")
 
     obs = await agent.observe(max_tokens=2000)
-    print(obs.summary)           # high-signal one-liner
-    print(obs.interactive[0])  # {ref, role, text, href, ...}
-
-    result = await agent.click(ref, text_hint="Pre-Order")  # recovery hint
-    await agent.resync()  # nuclear option
+    if obs.page_gate not in (None, "open", "cookie_wall", "unknown"):
+        print("blocked:", obs.page_gate, obs.page_gate_hint)
+    else:
+        # Outcome-verified: ok only if URL contains /issues
+        result = await agent.click_text("Issues", scope="nav", intent="issues")
+        assert result.ok and "/issues" in result.url_after
 
     tools = tools_as_openai()
-    await agent.call_tool("browser_prepare", {})
 ```
 
 ### Detail levels
