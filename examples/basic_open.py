@@ -43,7 +43,11 @@ async def main() -> None:
         print("elements:", json.dumps([e.model_dump() for e in snap.elements], indent=2))
 
         search = next(e for e in snap.elements if e.attributes.get("id") == "q")
-        go = next(e for e in snap.elements if e.text == "Search")
+        go = next(
+            e
+            for e in snap.elements
+            if e.type == "button" and e.attributes.get("id") == "go"
+        )
 
         await page.fill(search.id, "wireless headphones")
         await page.click(go.id)
