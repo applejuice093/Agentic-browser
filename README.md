@@ -134,12 +134,27 @@ Not a replacement for bulk HTTP scraping, and not a captcha solver.
 - Git  
 - ~Windows / macOS / Linux  
 
-### Library + dev
+### From PyPI (recommended)
+
+PyPI package name is **`agentic-browser`** (import and CLI stay `agent_browser` / `agent-browser`).
+
+```bash
+pip install agentic-browser
+playwright install chromium
+
+# with MCP extras
+pip install "agentic-browser[mcp]"
+
+# with vision / OCR extras
+pip install "agentic-browser[vision]"
+```
+
+### From source (library + dev)
 
 ```bash
 git clone https://github.com/applejuice093/Agentic-browser.git
 cd Agentic-browser
-git checkout dev
+git checkout main
 
 python -m venv .venv
 
@@ -153,14 +168,14 @@ playwright install chromium
 pytest -q
 ```
 
-### With MCP (Claude / Cursor)
+### With MCP from source (Claude / Cursor)
 
 ```bash
 pip install -e ".[mcp,dev]"
 playwright install chromium
 ```
 
-### Optional vision (local OCR)
+### Optional vision from source (local OCR)
 
 ```bash
 pip install -e ".[vision]"
@@ -171,11 +186,11 @@ pip install -e ".[vision]"
 
 | Extra | Install | Provides |
 |-------|---------|----------|
-| default | `pip install -e .` | Core browser + agent API |
-| `mcp` | `pip install -e ".[mcp]"` | MCP server for hosts |
+| default | `pip install agentic-browser` or `pip install -e .` | Core browser + agent API |
+| `mcp` | `pip install "agentic-browser[mcp]"` | MCP server for hosts |
 | `dev` | `pip install -e ".[dev]"` | pytest, ruff, mypy |
-| `vision` | `pip install -e ".[vision]"` | Pillow + pytesseract |
-| `all` | `pip install -e ".[all]"` | Everything |
+| `vision` | `pip install "agentic-browser[vision]"` | Pillow + pytesseract |
+| `all` | `pip install "agentic-browser[all]"` or `pip install -e ".[all]"` | Everything |
 
 ---
 

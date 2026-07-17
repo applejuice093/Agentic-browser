@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agent-browser"
+name = "agentic-browser"
 version = "0.4.0"
 description = "AI Agent-First Browser: semantic web world model for LLM agents (library + MCP)"
 readme = "README.md"
@@ -59,10 +59,10 @@ dev = [
     "ruff>=0.8.0",
     "mypy>=1.13.0",
     "pre-commit>=4.0.0",
-    "agent-browser[mcp]",
+    "agentic-browser[mcp]",
 ]
 all = [
-    "agent-browser[vision,dev,mcp]",
+    "agentic-browser[vision,dev,mcp]",
 ]
 
 [project.urls]

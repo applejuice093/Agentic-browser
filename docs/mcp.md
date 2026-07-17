@@ -14,6 +14,15 @@ Core rule for models: **use compact tools** (`browser_observe`, `browser_click_t
 
 ## 1. Install
 
+**PyPI** (package name `agentic-browser`):
+
+```bash
+pip install "agentic-browser[mcp]"
+playwright install chromium
+```
+
+**From source:**
+
 ```bash
 git clone https://github.com/applejuice093/Agentic-browser.git
 cd Agentic-browser
@@ -28,7 +37,7 @@ pip install -e ".[mcp,dev]"
 playwright install chromium
 ```
 
-Or from the package extras only:
+Or from source with MCP extras only:
 
 ```bash
 pip install -e ".[mcp]"

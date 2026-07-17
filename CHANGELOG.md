@@ -2,6 +2,12 @@
 
 ## 0.4.0 — MCP server for Claude / Cursor / any MCP host
 
+### Packaging
+
+- PyPI project name: **`agentic-browser`** (`pip install agentic-browser`)
+- Import path and CLI unchanged: `agent_browser`, `agent-browser`, `agent-browser-mcp`
+- Name `agent-browser` was unavailable / too similar on PyPI
+
 ### Added
 
 - **`python -m agent_browser.mcp`** / **`agent-browser-mcp`** FastMCP stdio server

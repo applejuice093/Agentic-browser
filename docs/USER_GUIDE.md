@@ -1,7 +1,7 @@
 # Agentic Browser — User Guide
 
-**Version:** 0.2.x · **Package:** `agent-browser`  
-**Repo:** https://github.com/applejuice093/Agentic-browser
+**Version:** 0.4.x · **Package:** `agentic-browser` (import: `agent_browser`)  
+**Repo:** https://github.com/applejuice093/Agentic-browser · **PyPI:** https://pypi.org/project/agentic-browser/
 
 This guide shows how to install and use the AI agent-first browser: semantic snapshots, finders, events, network intelligence, vision, memory, and multi-agent sessions.
 
@@ -15,7 +15,18 @@ This guide shows how to install and use the AI agent-first browser: semantic sna
 - Git
 - Windows / macOS / Linux
 
-### Setup
+### From PyPI
+
+```bash
+pip install agentic-browser
+playwright install chromium
+
+# optional extras
+pip install "agentic-browser[mcp]"
+pip install "agentic-browser[vision]"
+```
+
+### From source
 
 ```bash
 git clone https://github.com/applejuice093/Agentic-browser.git
@@ -31,7 +42,7 @@ pip install -e ".[dev]"
 playwright install chromium
 ```
 
-### Optional extras
+### Optional extras (source)
 
 ```bash
 # OCR / vision (needs system Tesseract for real OCR)
