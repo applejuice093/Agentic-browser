@@ -1,8 +1,9 @@
+#!/usr/bin/env python3
 """
 Minimal custom agent using OpenAI-compatible tool schemas + agent-browser.
 
 Requires: pip install openai
-  set OPENAI_API_KEY=...
+  Copy .env.example → .env and set OPENAI_API_KEY=... (never commit secrets)
 
     python examples/openai_tool_agent.py
 """

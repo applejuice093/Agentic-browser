@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 M3 example: snapshot diffs + event stream + MutationObserver.
 

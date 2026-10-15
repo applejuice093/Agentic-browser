@@ -2,7 +2,7 @@
 
 Source: [deep-research-report.md](../deep-research-report.md) — Implementation Roadmap.
 
-Each milestone has a **git branch**. Work on the branch for the active milestone; merge into `dev` when ready.
+Each milestone has a **git branch**. Milestone branches are complete. New work should target `main` via a short-lived branch (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 
 | Branch | ID | Feature | PM | Package area |
 |--------|----|---------|----|--------------|

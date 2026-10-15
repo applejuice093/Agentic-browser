@@ -1,3 +1,6 @@
+# Keep in sync with [project] dependencies in pyproject.toml.
+# Prefer: pip install -e ".[dev]" (or ".[mcp]", ".[vision]", ".[all]").
+
 # Core (M1+)
 playwright>=1.49.0
 pydantic>=2.10.0
@@ -13,9 +16,13 @@ typing-extensions>=4.12.0
 # Pillow>=11.0.0
 # System binary: Tesseract OCR (+ TESSERACT_CMD on Windows)
 
-# Dev / test
+# MCP server — optional; also: pip install -e ".[mcp]"
+# mcp>=1.0.0
+
+# Dev / test — also: pip install -e ".[dev]"
 pytest>=8.3.0
 pytest-asyncio>=0.24.0
 pytest-cov>=6.0.0
 ruff>=0.8.0
 mypy>=1.13.0
+pre-commit>=4.0.0

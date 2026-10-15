@@ -12,7 +12,7 @@
 
 > Not another HTML scraper. A **real Chromium browser** controlled with **semantic tools** — so Claude, Cursor, LangGraph, or your own agent can **see, click, type, and verify** without drowning in 100k+ tokens of markup.
 
-**Repo:** [github.com/applejuice093/Agentic-browser](https://github.com/applejuice093/Agentic-browser) · **Branch:** `dev`
+**Repo:** [github.com/applejuice093/Agentic-browser](https://github.com/applejuice093/Agentic-browser) · **Default branch:** `main`
 
 ---
 
@@ -132,7 +132,7 @@ Not a replacement for bulk HTTP scraping, and not a captcha solver.
 
 - **Python 3.11+**
 - Git  
-- ~Windows / macOS / Linux  
+- Windows / macOS / Linux  
 
 ### From PyPI (recommended)
 
@@ -204,13 +204,13 @@ python -m agent_browser.mcp
 agent-browser-mcp
 ```
 
-**Cursor** — `.cursor/mcp.json` (use **your** venv Python path):
+**Cursor** — `.cursor/mcp.json` (use **your** Python / venv path):
 
 ```json
 {
   "mcpServers": {
     "agent-browser": {
-      "command": "C:\\A\\PROJECT\\Agentic Browser\\.venv\\Scripts\\python.exe",
+      "command": "python",
       "args": ["-m", "agent_browser.mcp"],
       "env": {
         "AGENT_BROWSER_HEADLESS": "true",
@@ -222,13 +222,15 @@ agent-browser-mcp
 }
 ```
 
+Copy a ready-made stub from [`examples/mcp_config_cursor.json`](./examples/mcp_config_cursor.json). On Windows, set `"command"` to your `.venv\\Scripts\\python.exe` if `python` is not on PATH.
+
 **Claude Desktop** — `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "agent-browser": {
-      "command": "C:\\A\\PROJECT\\Agentic Browser\\.venv\\Scripts\\python.exe",
+      "command": "python",
       "args": ["-m", "agent_browser.mcp"],
       "env": { "AGENT_BROWSER_HEADLESS": "true" }
     }
@@ -333,7 +335,7 @@ tests/                   # 118+ automated tests
 ## Development
 
 ```bash
-git checkout dev
+git checkout main
 pip install -e ".[dev,mcp]"
 playwright install chromium
 pytest -q
@@ -342,6 +344,7 @@ ruff check src tests
 
 | Doc | Topic |
 |-----|--------|
+| [`docs/README.md`](./docs/README.md) | **Docs index** |
 | [`docs/mcp.md`](./docs/mcp.md) | **Install into your agent (MCP + tools)** |
 | [`docs/USER_GUIDE.md`](./docs/USER_GUIDE.md) | Full product guide |
 | [`docs/agent-native-loop.md`](./docs/agent-native-loop.md) | Observe / act / gates / skills |
@@ -361,9 +364,6 @@ ruff check src tests
 | Grounding + outcomes + GitHub skill (v0.3.2) | **Done** |
 | MCP host integration (v0.4.0) | **Done** |
 | More domain skills, vision-in-loop, pool/scale | Next |
-
----
-
 
 ---
 

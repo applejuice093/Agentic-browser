@@ -1,7 +1,10 @@
+#!/usr/bin/env python3
 """
 Agent-native loop demo (compact observe → click by ref).
 
     python examples/agent_loop_demo.py
+
+Optional: copy .env.example → .env for AGENT_BROWSER_* settings.
 """
 
 from __future__ import annotations

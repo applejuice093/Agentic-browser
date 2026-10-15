@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — 2026-10-15 polish
+
+### Docs & packaging
+
+- README: default branch `main`, portable MCP config example, docs index link
+- `requirements.txt` aligned with `pyproject.toml` extras (`mcp`, `pre-commit`)
+- `.gitignore`: Playwright test artifacts + `coverage.xml`
+- Added `Makefile`, `CONTRIBUTING.md`, and `docs/README.md` index
+- Examples: shebangs, `.env.example` pointers, correct `agentic-browser[vision]` install name
+- Milestone docs point new work at `main`
+
+### API / code
+
+- `BrowserConfig` field descriptions for all settings
+- Public exports: `TimeoutError`, `BrowserAlreadyStartedError`
+- CLI: `Literal` browser types; observation package re-exports helpers
+
+### Tests
+
+- Expanded `test_config.py` (env, validation, overrides)
+- Added `test_exceptions.py` and `test_observation_compact.py` (no Playwright)
+
+
 ## 0.4.0 — MCP server for Claude / Cursor / any MCP host
 
 ### Packaging

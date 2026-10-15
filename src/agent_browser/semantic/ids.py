@@ -11,6 +11,7 @@ _WS = re.compile(r"\s+")
 
 
 def normalize_text(text: str | None, *, limit: int = 80) -> str:
+    """Collapse whitespace and truncate text used in fingerprints."""
     if not text:
         return ""
     return _WS.sub(" ", text).strip()[:limit]

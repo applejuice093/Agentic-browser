@@ -28,7 +28,10 @@ class SnapshotError(AgentBrowserError):
 
 
 class TimeoutError(AgentBrowserError):
-    """Raised when an operation exceeds the configured timeout."""
+    """Raised when an operation exceeds the configured timeout.
+
+    Distinct from ``builtins.TimeoutError``; catch this for library timeouts.
+    """
 
 
 class VisionError(AgentBrowserError):
