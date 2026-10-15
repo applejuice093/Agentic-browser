@@ -17,11 +17,13 @@ from agent_browser.config import BrowserConfig
 from agent_browser.events import DiffEngine, EventBus
 from agent_browser.exceptions import (
     AgentBrowserError,
+    BrowserAlreadyStartedError,
     BrowserNotStartedError,
     ElementNotFoundError,
     NavigationError,
     NetworkTimeoutError,
     SnapshotError,
+    TimeoutError,
     VisionError,
 )
 from agent_browser.memory import MemoryStore
@@ -91,10 +93,12 @@ __all__ = [
     "MultiAgentSession",
     "AgentHandle",
     "AgentBrowserError",
+    "BrowserAlreadyStartedError",
     "BrowserNotStartedError",
     "ElementNotFoundError",
     "NavigationError",
     "NetworkTimeoutError",
     "SnapshotError",
+    "TimeoutError",
     "__version__",
 ]
