@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 M5 example: mock API, capture traffic, wait_for_api, GraphQL flag.
 

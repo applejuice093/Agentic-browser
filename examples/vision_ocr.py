@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
 """
 M4 example: screenshot OCR + optional UI detection.
 
-Requires: pip install 'agent-browser[vision]' and system Tesseract for real OCR.
+Requires: pip install 'agentic-browser[vision]' (or pip install -e '.[vision]') and system Tesseract for real OCR.
+Optional: copy .env.example → .env and set TESSERACT_CMD on Windows.
 Without Tesseract, detection still runs if Pillow is installed.
 
     python examples/vision_ocr.py

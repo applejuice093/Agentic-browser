@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 M1 example: open a page (offline HTML) and interact via snapshot IDs.
 
@@ -6,6 +7,8 @@ Usage:
     pip install -e ".[dev]"
     playwright install chromium
     python examples/basic_open.py
+
+Optional config: copy .env.example to .env (AGENT_BROWSER_* vars).
 """
 
 from __future__ import annotations
