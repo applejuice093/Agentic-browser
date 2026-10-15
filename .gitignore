@@ -28,6 +28,8 @@ ENV/
 # Testing / coverage
 .pytest_cache/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
 .mypy_cache/
 .ruff_cache/
@@ -47,8 +49,12 @@ credentials.json
 Thumbs.db
 desktop.ini
 
-# Playwright / browsers (local install caches)
+# Playwright / browsers (local install caches and test artifacts)
 playwright/.cache/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
 
 # Runtime / session data
 *.db
