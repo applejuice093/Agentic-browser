@@ -1,4 +1,4 @@
-"""CLI entrypoint for agent-browser (M1)."""
+"""CLI entrypoint for ``agent-browser`` (open, scrape, version)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import argparse
 import asyncio
 import json
 import sys
-from typing import Sequence
+from typing import Literal, Sequence
 
 from agent_browser import Browser, __version__
 from agent_browser.exceptions import AgentBrowserError
@@ -83,14 +83,14 @@ async def _cmd_open(
     url: str,
     *,
     headless: bool,
-    browser_type: str,
+    browser_type: Literal["chromium", "firefox", "webkit"],
     timeout_ms: int,
     include_raw_html: bool,
     compact: bool,
 ) -> int:
     async with Browser(
         headless=headless,
-        browser_type=browser_type,  # type: ignore[arg-type]
+        browser_type=browser_type,
         default_timeout_ms=timeout_ms,
     ) as browser:
         page = await browser.open(url)
@@ -107,7 +107,7 @@ async def _cmd_scrape(
     url: str,
     *,
     headless: bool,
-    browser_type: str,
+    browser_type: Literal["chromium", "firefox", "webkit"],
     timeout_ms: int,
     out: str,
     goal: str,
@@ -116,7 +116,7 @@ async def _cmd_scrape(
 
     async with Browser(
         headless=headless,
-        browser_type=browser_type,  # type: ignore[arg-type]
+        browser_type=browser_type,
         default_timeout_ms=timeout_ms,
     ) as browser:
         page = await browser.open(url)
