@@ -12,6 +12,17 @@ from typing import Any, Literal
 from agent_browser import Browser, __version__
 
 
+def _timeout_ms(raw: str) -> int:
+    """argparse type for --timeout: a non-negative integer of milliseconds."""
+    try:
+        value = int(raw)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected milliseconds, got {raw!r}") from None
+    if value < 0:
+        raise argparse.ArgumentTypeError("timeout must be 0 or more milliseconds")
+    return value
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="agent-browser",
@@ -35,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--timeout",
-        type=int,
+        type=_timeout_ms,
         default=30_000,
         metavar="MS",
         help="Default timeout in milliseconds (default: 30000)",
