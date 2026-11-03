@@ -50,3 +50,13 @@ def test_rejects_inverted_ranges():
         HumanizedInput(click_pause_ms=(300, 100))
     with pytest.raises(ValueError):
         HumanizedInput(move_steps=(30, 5))
+
+
+def test_target_point_stays_inside_tiny_boxes():
+    h = HumanizedInput()
+    # A 1x1 box used to be clamped to x + 1, i.e. just outside the element.
+    p = h.target_point_from_box(100, 200, 1, 1)
+    assert (p.x, p.y) == (100.5, 200.5)
+    for _ in range(200):
+        q = h.target_point_from_box(10, 20, 40, 6)
+        assert 11 <= q.x <= 49 and 21 <= q.y <= 25

@@ -104,13 +104,16 @@ class HumanizedInput:
         height: float,
     ) -> Point:
         """Pick a click point inside a box (not always center)."""
-        if not self.enabled:
-            return Point(x + width / 2, y + height / 2)
-        # Bias toward center with Gaussian-ish noise
+        center = Point(x + width / 2, y + height / 2)
+        # Boxes under ~2px have no safe interior margin: the old clamp to
+        # [x + 1, x + width - 1] could land outside the element, so use the center.
+        if not self.enabled or width <= 2 or height <= 2:
+            return center
+        # Bias toward center with Gaussian-ish noise, kept 1px inside the edges
         px = x + width * random.gauss(0.5, 0.12)
         py = y + height * random.gauss(0.5, 0.12)
-        px = min(max(px, x + 1), x + max(width - 1, 1))
-        py = min(max(py, y + 1), y + max(height - 1, 1))
+        px = min(max(px, x + 1), x + width - 1)
+        py = min(max(py, y + 1), y + height - 1)
         return Point(px, py)
 
     def typing_profile(self, text: str) -> list[float]:
