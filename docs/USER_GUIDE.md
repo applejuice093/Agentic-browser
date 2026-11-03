@@ -274,7 +274,7 @@ page.on_event("network_error", lambda e: print("ERR", e.data))
 ## 9. Vision / OCR (M4)
 
 ```python
-# Requires: pip install 'agent-browser[vision]' + Tesseract binary
+# Requires: pip install 'agentic-browser[vision]' + Tesseract binary
 regions = await page.get_text_in_screenshot()
 # [{x,y,width,height,text,confidence}, ...]
 
