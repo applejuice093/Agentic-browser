@@ -37,18 +37,13 @@ async def test_manager_call_tool_observe_example():
         await mgr.stop()
 
 
-def test_create_mcp_server_registers_tools():
+async def test_create_mcp_server_registers_tools():
+    """Every tool in TOOL_DEFINITIONS is exposed over MCP (mcp 1.x and 2.x)."""
+    pytest.importorskip("mcp")
+    from agent_browser.agent.tools import TOOL_DEFINITIONS
     from agent_browser.mcp.server import create_mcp_server
 
     server = create_mcp_server()
-    assert server is not None
-    # FastMCP stores tools by name
-    names = set()
-    tools = getattr(server, "_tool_manager", None) or getattr(server, "_tools", None)
-    if tools is not None:
-        if hasattr(tools, "list_tools"):
-            pass
-        elif isinstance(tools, dict):
-            names = set(tools.keys())
-    # At minimum construction succeeds with mcp installed
-    assert create_mcp_server is not None
+    registered = {tool.name for tool in await server.list_tools()}
+    expected = {t.get("name") or t["function"]["name"] for t in TOOL_DEFINITIONS}
+    assert registered == expected
