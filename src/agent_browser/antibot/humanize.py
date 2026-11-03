@@ -30,6 +30,12 @@ class HumanizedInput:
         click_pause_ms: tuple[float, float] = (40, 180),
         move_steps: tuple[int, int] = (8, 20),
     ) -> None:
+        if min_delay_ms < 0 or max_delay_ms < min_delay_ms:
+            raise ValueError(
+                f"need 0 <= min_delay_ms <= max_delay_ms, got {min_delay_ms}, {max_delay_ms}"
+            )
+        if click_pause_ms[0] > click_pause_ms[1] or move_steps[0] > move_steps[1]:
+            raise ValueError("click_pause_ms and move_steps must be (low, high) pairs")
         self.enabled = enabled
         self.min_delay_ms = min_delay_ms
         self.max_delay_ms = max_delay_ms

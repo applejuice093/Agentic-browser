@@ -41,3 +41,12 @@ async def test_humanized_click():
         page.set_humanize(True)
         await page.click("#b")
         assert await page.evaluate("() => document.body.dataset.clicked") == "1"
+
+
+def test_rejects_inverted_ranges():
+    with pytest.raises(ValueError):
+        HumanizedInput(min_delay_ms=200, max_delay_ms=50)
+    with pytest.raises(ValueError):
+        HumanizedInput(click_pause_ms=(300, 100))
+    with pytest.raises(ValueError):
+        HumanizedInput(move_steps=(30, 5))
