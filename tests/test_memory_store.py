@@ -21,3 +21,22 @@ def test_sqlite_connections_are_closed(tmp_path):
     mem.delete("k")
     mem.clear()
     gc.collect()
+
+
+def test_reopened_session_restores_history(tmp_path):
+    db = tmp_path / "mem.db"
+    first = MemoryStore("s1", db_path=db)
+    first.set("goal", "find docs")
+    first.log_url("https://example.com/a")
+    first.log_action({"type": "type", "field": "password", "value": "hunter2"})
+    first.remember_form("login", {"user": "ana", "password": "hunter2"})
+
+    again = MemoryStore("s1", db_path=db)
+    assert again.get("goal") == "find docs"
+    summary = again.memory_summary()
+    assert summary["visited_urls"] == ["https://example.com/a"]
+    assert summary["recent_actions"][0]["value"] == "***"
+    assert summary["forms"] == {"login": {"user": "ana", "password": "***"}}
+
+    other = MemoryStore("s2", db_path=db)
+    assert other.actions() == [] and other.summary()["urls"] == []

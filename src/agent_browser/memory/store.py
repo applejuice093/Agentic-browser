@@ -86,6 +86,27 @@ class MemoryStore:
                     self._kv[key] = json.loads(value)
                 except json.JSONDecodeError:
                     self._kv[key] = value
+            # Restore history too, so a reopened session's summaries include
+            # the actions and URLs it already wrote to disk.
+            for ts, action_json in conn.execute(
+                "SELECT ts, action_json FROM memory_actions WHERE session_id=? ORDER BY ts",
+                (self.session_id,),
+            ):
+                try:
+                    action = json.loads(action_json)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(action, dict):
+                    action.setdefault("timestamp", ts)
+                    self._actions.append(action)
+            for ts, url in conn.execute(
+                "SELECT ts, url FROM memory_urls WHERE session_id=? ORDER BY ts",
+                (self.session_id,),
+            ):
+                self._urls.append({"url": url, "timestamp": ts})
+            for key, value in self._kv.items():
+                if key.startswith("form:") and isinstance(value, dict):
+                    self._forms[key[len("form:") :]] = value
 
     @staticmethod
     def _is_sensitive(key: str) -> bool:
