@@ -7,11 +7,15 @@ so LLM agents can reason about the same structure they act on.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from agent_browser.models.element import Element
 from agent_browser.models.snapshot import Snapshot
 from agent_browser.page import Page
+
+# h1-h6 only: a bare startswith("h") also matched <header>, <hr>, <html> ...
+_HEADING_TAG = re.compile(r"h[1-6]")
 
 
 def elements_to_records(
@@ -53,7 +57,7 @@ def snapshot_to_scrape_result(snapshot: Snapshot) -> dict[str, Any]:
     headings = [
         e
         for e in els
-        if (e.role or "") == "heading" or (e.type or "").startswith("h")
+        if (e.role or "") == "heading" or _HEADING_TAG.fullmatch((e.type or "").lower())
     ]
     links = [e for e in els if (e.role or "") == "link" or e.type == "a"]
     buttons = [e for e in els if (e.role or "") == "button" or e.type == "button"]

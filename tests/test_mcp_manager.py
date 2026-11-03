@@ -37,18 +37,54 @@ async def test_manager_call_tool_observe_example():
         await mgr.stop()
 
 
-def test_create_mcp_server_registers_tools():
+async def test_create_mcp_server_registers_tools():
+    """Every tool in TOOL_DEFINITIONS is exposed over MCP (mcp 1.x and 2.x)."""
+    pytest.importorskip("mcp")
+    from agent_browser.agent.tools import TOOL_DEFINITIONS
     from agent_browser.mcp.server import create_mcp_server
 
     server = create_mcp_server()
-    assert server is not None
-    # FastMCP stores tools by name
-    names = set()
-    tools = getattr(server, "_tool_manager", None) or getattr(server, "_tools", None)
-    if tools is not None:
-        if hasattr(tools, "list_tools"):
-            pass
-        elif isinstance(tools, dict):
-            names = set(tools.keys())
-    # At minimum construction succeeds with mcp installed
-    assert create_mcp_server is not None
+    registered = {tool.name for tool in await server.list_tools()}
+    expected = {t.get("name") or t["function"]["name"] for t in TOOL_DEFINITIONS}
+    assert registered == expected
+
+
+async def test_blocked_navigation_returns_structured_error():
+    """Allowlist and URL problems come back as results, without starting a browser."""
+    mgr = McpSessionManager(allowed_hosts=["github.com"])
+    blocked = await mgr.call_tool("browser_navigate", {"url": "https://evil.example/"})
+    assert blocked["ok"] is False
+    assert blocked["error_code"] == "blocked"
+
+    missing = await mgr.call_tool("browser_navigate", {})
+    assert missing["error_code"] == "invalid_args"
+
+    bad = await mgr.call_tool("browser_navigate", {"url": "not a url"})
+    assert bad["error_code"] == "invalid_args"
+    assert mgr._browser is None
+
+
+def test_allowlist_normalizes_entries_and_rejects_other_schemes():
+    mgr = McpSessionManager(allowed_hosts=["https://GitHub.com/", "example.org:443", ".docs.rs"])
+    assert mgr.allowed_hosts == ["github.com", "example.org", "docs.rs"]
+    mgr.check_url_allowed("https://github.com./vercel")
+    mgr.check_url_allowed("http://www.example.org/page")
+    mgr.check_url_allowed("https://docs.rs/tokio")
+    with pytest.raises(PermissionError):
+        mgr.check_url_allowed("file://github.com/etc/passwd")
+    with pytest.raises(PermissionError):
+        mgr.check_url_allowed("https://github.com.evil.example/")
+
+
+def test_env_settings_are_validated_with_clear_errors(monkeypatch):
+    monkeypatch.setenv("AGENT_BROWSER_MAX_TOKENS", "lots")
+    with pytest.raises(ValueError, match="AGENT_BROWSER_MAX_TOKENS"):
+        McpSessionManager()
+    monkeypatch.setenv("AGENT_BROWSER_MAX_TOKENS", "1500")
+    monkeypatch.setenv("AGENT_BROWSER_DETAIL", "verbose")
+    with pytest.raises(ValueError, match="AGENT_BROWSER_DETAIL"):
+        McpSessionManager()
+    monkeypatch.setenv("AGENT_BROWSER_DETAIL", "Sparse")
+    monkeypatch.setenv("AGENT_BROWSER_HEADLESS", "on")
+    mgr = McpSessionManager()
+    assert (mgr.max_tokens, mgr.detail, mgr.headless) == (1500, "sparse", True)

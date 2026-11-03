@@ -23,7 +23,7 @@ def _load_pil():
     except ImportError as exc:
         raise VisionDependencyError(
             "Pillow is required for vision features. "
-            "Install with: pip install 'agent-browser[vision]'"
+            "Install with: pip install 'agentic-browser[vision]'"
         ) from exc
     return Image
 
@@ -34,7 +34,7 @@ def _load_pytesseract(tesseract_cmd: str | None = None):
     except ImportError as exc:
         raise VisionDependencyError(
             "pytesseract is required for OCR. "
-            "Install with: pip install 'agent-browser[vision]'"
+            "Install with: pip install 'agentic-browser[vision]'"
         ) from exc
     cmd = tesseract_cmd or os.environ.get("TESSERACT_CMD") or os.environ.get(
         "AGENT_BROWSER_TESSERACT_CMD"
@@ -83,7 +83,7 @@ class OCREngine:
         if not self.is_available():
             raise VisionDependencyError(
                 "OCR is not available. Install vision extras and Tesseract:\n"
-                "  pip install 'agent-browser[vision]'\n"
+                "  pip install 'agentic-browser[vision]'\n"
                 "  # Windows: install Tesseract-OCR and set TESSERACT_CMD\n"
                 "  # Debian: sudo apt install tesseract-ocr"
             )

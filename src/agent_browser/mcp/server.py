@@ -24,14 +24,22 @@ def _json(data: Any) -> str:
 
 
 def create_mcp_server() -> Any:
-    """Build a FastMCP server instance with all browser tools registered."""
+    """Build an MCP server instance with all browser tools registered.
+
+    Supports both SDK lines: mcp 2.x renamed ``FastMCP`` to ``MCPServer``
+    (``mcp.server.mcpserver``), while mcp 1.x only has ``mcp.server.fastmcp``.
+    The constructor, ``tool()`` decorator and ``run()`` are compatible.
+    """
     try:
-        from mcp.server.fastmcp import FastMCP
-    except ImportError as exc:
-        raise ImportError(
-            "MCP SDK required. Install with: pip install 'agent-browser[mcp]' "
-            "or pip install mcp"
-        ) from exc
+        from mcp.server.mcpserver import MCPServer as FastMCP
+    except ImportError:
+        try:
+            from mcp.server.fastmcp import FastMCP
+        except ImportError as exc:
+            raise ImportError(
+                "MCP SDK required. Install with: pip install 'agentic-browser[mcp]' "
+                "or pip install mcp"
+            ) from exc
 
     mcp = FastMCP(
         "agent-browser",
@@ -183,7 +191,7 @@ def main() -> None:
     """CLI entry: stdio MCP server."""
     logging.basicConfig(level=logging.INFO)
     mcp = create_mcp_server()
-    # FastMCP.run() defaults to stdio transport for host integration
+    # run() defaults to the stdio transport for host integration
     mcp.run()
 
 

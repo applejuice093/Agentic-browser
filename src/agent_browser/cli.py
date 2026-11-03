@@ -6,16 +6,27 @@ import argparse
 import asyncio
 import json
 import sys
-from typing import Literal, Sequence
+from collections.abc import Coroutine, Sequence
+from typing import Any, Literal
 
 from agent_browser import Browser, __version__
-from agent_browser.exceptions import AgentBrowserError
+
+
+def _timeout_ms(raw: str) -> int:
+    """argparse type for --timeout: a non-negative integer of milliseconds."""
+    try:
+        value = int(raw)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected milliseconds, got {raw!r}") from None
+    if value < 0:
+        raise argparse.ArgumentTypeError("timeout must be 0 or more milliseconds")
+    return value
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="agent-browser",
-        description="AI Agent-First Browser CLI (M1: open + snapshot)",
+        description="AI Agent-First Browser CLI: open a page as a JSON snapshot or scrape it",
     )
     parser.add_argument(
         "--version",
@@ -35,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--timeout",
-        type=int,
+        type=_timeout_ms,
         default=30_000,
         metavar="MS",
         help="Default timeout in milliseconds (default: 30000)",
@@ -148,47 +159,39 @@ def main(argv: Sequence[str] | None = None) -> None:
         raise SystemExit(0)
 
     if args.command == "open":
-        try:
-            code = asyncio.run(
-                _cmd_open(
-                    args.url,
-                    headless=not args.headed,
-                    browser_type=args.browser,
-                    timeout_ms=args.timeout,
-                    include_raw_html=args.raw_html,
-                    compact=args.compact,
-                )
-            )
-        except AgentBrowserError as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            raise SystemExit(1) from exc
-        except Exception as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            raise SystemExit(1) from exc
-        raise SystemExit(code)
+        coro = _cmd_open(
+            args.url,
+            headless=not args.headed,
+            browser_type=args.browser,
+            timeout_ms=args.timeout,
+            include_raw_html=args.raw_html,
+            compact=args.compact,
+        )
+    elif args.command == "scrape":
+        coro = _cmd_scrape(
+            args.url,
+            headless=not args.headed,
+            browser_type=args.browser,
+            timeout_ms=args.timeout,
+            out=args.out,
+            goal=args.goal,
+        )
+    else:
+        parser.print_help()
+        raise SystemExit(1)
+    raise SystemExit(_run(coro))
 
-    if args.command == "scrape":
-        try:
-            code = asyncio.run(
-                _cmd_scrape(
-                    args.url,
-                    headless=not args.headed,
-                    browser_type=args.browser,
-                    timeout_ms=args.timeout,
-                    out=args.out,
-                    goal=args.goal,
-                )
-            )
-        except AgentBrowserError as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            raise SystemExit(1) from exc
-        except Exception as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            raise SystemExit(1) from exc
-        raise SystemExit(code)
 
-    parser.print_help()
-    raise SystemExit(1)
+def _run(coro: Coroutine[Any, Any, int]) -> int:
+    """Run a command coroutine, turning failures into a short message + exit code."""
+    try:
+        return asyncio.run(coro)
+    except KeyboardInterrupt:
+        print("interrupted", file=sys.stderr)
+        return 130
+    except Exception as exc:  # AgentBrowserError, Playwright errors, I/O errors
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

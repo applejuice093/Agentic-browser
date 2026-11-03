@@ -78,6 +78,22 @@ Hosts spawn this for you via config (stdio).
 | `AGENT_BROWSER_DEFAULT_TIMEOUT_MS` | `30000` | Playwright timeout |
 | `AGENT_BROWSER_ALLOWED_HOSTS` | _(empty = all)_ | Comma list, e.g. `github.com,example.com` |
 
+Numeric values are checked at startup, and a bad value produces an error naming
+the variable. `AGENT_BROWSER_DETAIL` is case-insensitive.
+
+**Allowlist behaviour.** When `AGENT_BROWSER_ALLOWED_HOSTS` is set:
+
+- Entries match the host and its subdomains (`github.com` allows `api.github.com`).
+- Entries may be written as `github.com`, `https://github.com/` or `github.com:443`.
+  Each is reduced to the bare hostname.
+- Only `http://` and `https://` URLs are allowed. `file://` and other schemes are refused.
+- A refused `browser_navigate` returns `{"ok": false, "error_code": "blocked", ...}`,
+  and a missing or malformed URL returns `error_code: "invalid_args"`. Neither starts a browser.
+- The check applies to `browser_navigate`. Links clicked on an allowed page can still
+  lead elsewhere, so treat the allowlist as a guard rail, not a sandbox.
+
+The server works with both `mcp` 1.x (`FastMCP`) and 2.x (`MCPServer`).
+
 ### Cursor
 
 Create or edit **Cursor MCP config** (project or global).

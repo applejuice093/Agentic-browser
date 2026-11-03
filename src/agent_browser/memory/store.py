@@ -6,6 +6,8 @@ import json
 import sqlite3
 import time
 import uuid
+from collections.abc import Iterator
+from contextlib import closing, contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -35,10 +37,21 @@ class MemoryStore:
             self._init_db()
             self._load_db()
 
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        """Open the DB, commit on success, and always close the connection.
+
+        ``with sqlite3.connect(...)`` only commits/rolls back; it never closes,
+        so every write leaked a connection (and kept the file locked on Windows).
+        """
+        assert self._db_path is not None
+        with closing(sqlite3.connect(self._db_path)) as conn, conn:
+            yield conn
+
     def _init_db(self) -> None:
         assert self._db_path is not None
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(self._db_path) as conn:
+        with self._connect() as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS memory_kv (
@@ -64,7 +77,7 @@ class MemoryStore:
 
     def _load_db(self) -> None:
         assert self._db_path is not None
-        with sqlite3.connect(self._db_path) as conn:
+        with self._connect() as conn:
             for key, value in conn.execute(
                 "SELECT key, value FROM memory_kv WHERE session_id=?",
                 (self.session_id,),
@@ -73,6 +86,27 @@ class MemoryStore:
                     self._kv[key] = json.loads(value)
                 except json.JSONDecodeError:
                     self._kv[key] = value
+            # Restore history too, so a reopened session's summaries include
+            # the actions and URLs it already wrote to disk.
+            for ts, action_json in conn.execute(
+                "SELECT ts, action_json FROM memory_actions WHERE session_id=? ORDER BY ts",
+                (self.session_id,),
+            ):
+                try:
+                    action = json.loads(action_json)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(action, dict):
+                    action.setdefault("timestamp", ts)
+                    self._actions.append(action)
+            for ts, url in conn.execute(
+                "SELECT ts, url FROM memory_urls WHERE session_id=? ORDER BY ts",
+                (self.session_id,),
+            ):
+                self._urls.append({"url": url, "timestamp": ts})
+            for key, value in self._kv.items():
+                if key.startswith("form:") and isinstance(value, dict):
+                    self._forms[key[len("form:") :]] = value
 
     @staticmethod
     def _is_sensitive(key: str) -> bool:
@@ -86,12 +120,15 @@ class MemoryStore:
         return value
 
     def set(self, key: str, value: Any) -> None:
+        # Serialise first so a non-JSON value can't leave memory and disk out
+        # of sync (previously the dict was updated before json.dumps raised).
+        encoded = json.dumps(value, default=str) if self._db_path else None
         self._kv[key] = value
         if self._db_path:
-            with sqlite3.connect(self._db_path) as conn:
+            with self._connect() as conn:
                 conn.execute(
                     "INSERT OR REPLACE INTO memory_kv(session_id, key, value, ts) VALUES (?,?,?,?)",
-                    (self.session_id, key, json.dumps(value), time.time()),
+                    (self.session_id, key, encoded, time.time()),
                 )
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -100,7 +137,7 @@ class MemoryStore:
     def delete(self, key: str) -> None:
         self._kv.pop(key, None)
         if self._db_path:
-            with sqlite3.connect(self._db_path) as conn:
+            with self._connect() as conn:
                 conn.execute(
                     "DELETE FROM memory_kv WHERE session_id=? AND key=?",
                     (self.session_id, key),
@@ -118,17 +155,17 @@ class MemoryStore:
         safe.setdefault("timestamp", time.time())
         self._actions.append(safe)
         if self._db_path:
-            with sqlite3.connect(self._db_path) as conn:
+            with self._connect() as conn:
                 conn.execute(
                     "INSERT INTO memory_actions(session_id, ts, action_json) VALUES (?,?,?)",
-                    (self.session_id, safe["timestamp"], json.dumps(safe)),
+                    (self.session_id, safe["timestamp"], json.dumps(safe, default=str)),
                 )
 
     def log_url(self, url: str) -> None:
         entry = {"url": url, "timestamp": time.time()}
         self._urls.append(entry)
         if self._db_path:
-            with sqlite3.connect(self._db_path) as conn:
+            with self._connect() as conn:
                 conn.execute(
                     "INSERT INTO memory_urls(session_id, ts, url) VALUES (?,?,?)",
                     (self.session_id, entry["timestamp"], url),
@@ -168,7 +205,7 @@ class MemoryStore:
         self._urls.clear()
         self._forms.clear()
         if self._db_path:
-            with sqlite3.connect(self._db_path) as conn:
+            with self._connect() as conn:
                 conn.execute("DELETE FROM memory_kv WHERE session_id=?", (self.session_id,))
                 conn.execute("DELETE FROM memory_actions WHERE session_id=?", (self.session_id,))
                 conn.execute("DELETE FROM memory_urls WHERE session_id=?", (self.session_id,))

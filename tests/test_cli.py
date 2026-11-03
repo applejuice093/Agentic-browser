@@ -36,3 +36,16 @@ def test_main_help_no_command(capsys):
     assert ei.value.code == 0
     out = capsys.readouterr().out
     assert "agent-browser" in out
+
+
+@pytest.mark.parametrize("value", ["-1", "abc", "1.5"])
+def test_timeout_rejects_bad_values(value, capsys):
+    with pytest.raises(SystemExit) as exc:
+        build_parser().parse_args(["--timeout", value, "open", "https://example.com"])
+    assert exc.value.code == 2
+    assert "--timeout" in capsys.readouterr().err
+
+
+def test_timeout_accepts_zero():
+    args = build_parser().parse_args(["--timeout", "0", "open", "https://example.com"])
+    assert args.timeout == 0

@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 from agent_browser.agent.session import AgentSession
 from agent_browser.browser import Browser
 from agent_browser.config import BrowserConfig
+from agent_browser.models.observation import DetailLevel, ErrorCode
 
 
 class McpSessionManager:
@@ -29,21 +30,25 @@ class McpSessionManager:
         allowed_hosts: list[str] | None = None,
     ) -> None:
         if headless is None:
-            headless = os.environ.get("AGENT_BROWSER_HEADLESS", "true").lower() in (
+            headless = os.environ.get("AGENT_BROWSER_HEADLESS", "true").strip().lower() in (
                 "1",
                 "true",
                 "yes",
+                "on",
             )
         self.headless = headless
-        self.max_tokens = int(os.environ.get("AGENT_BROWSER_MAX_TOKENS", str(max_tokens)))
-        self.detail = os.environ.get("AGENT_BROWSER_DETAIL", detail)
-        self.settle_budget_ms = float(
-            os.environ.get("AGENT_BROWSER_SETTLE_MS", str(settle_budget_ms))
-        )
+        self.max_tokens = int(_env_number("AGENT_BROWSER_MAX_TOKENS", max_tokens, minimum=1))
+        self.detail = os.environ.get("AGENT_BROWSER_DETAIL", detail).strip().lower()
+        if self.detail not in _DETAIL_LEVELS:
+            raise ValueError(
+                f"AGENT_BROWSER_DETAIL must be one of {', '.join(_DETAIL_LEVELS)}, "
+                f"got {self.detail!r}"
+            )
+        self.settle_budget_ms = _env_number("AGENT_BROWSER_SETTLE_MS", settle_budget_ms)
         allow = allowed_hosts or _parse_allowlist(
             os.environ.get("AGENT_BROWSER_ALLOWED_HOSTS", "")
         )
-        self.allowed_hosts = [h.lower().lstrip(".") for h in allow if h]
+        self.allowed_hosts = [h for h in (_normalize_host(a) for a in allow) if h]
 
         self._browser: Browser | None = None
         self._agent: AgentSession | None = None
@@ -88,14 +93,24 @@ class McpSessionManager:
         return self._agent
 
     def check_url_allowed(self, url: str) -> None:
+        """Raise unless ``url`` is an http(s) URL on an allowed host.
+
+        With an allowlist set, other schemes are refused too: otherwise
+        ``file://github.com/etc/passwd`` would pass the host check.
+        """
         if not self.allowed_hosts:
             return
         try:
-            host = (urlparse(url).hostname or "").lower()
+            parsed = urlparse(url)
+            host = (parsed.hostname or "").lower().rstrip(".")
         except Exception as exc:
             raise ValueError(f"invalid url: {url}") from exc
         if not host:
             raise ValueError(f"invalid url host: {url}")
+        if parsed.scheme.lower() not in ("http", "https"):
+            raise PermissionError(
+                f"scheme {parsed.scheme!r} not allowed while AGENT_BROWSER_ALLOWED_HOSTS is set"
+            )
         for allowed in self.allowed_hosts:
             if host == allowed or host.endswith("." + allowed):
                 return
@@ -105,35 +120,65 @@ class McpSessionManager:
 
     async def call_tool(self, name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
         args = dict(arguments or {})
-        if name in ("browser_navigate",) and "url" in args:
-            self.check_url_allowed(str(args["url"]))
-        agent = await self.ensure_agent()
-        # First navigation via open if agent page is blank
-        if name == "browser_navigate" and self._browser is not None:
-            url = str(args.get("url", ""))
-            if url and (
-                not agent.page.url
-                or agent.page.url in ("about:blank", "chrome://newtab/")
-            ):
-                # use agent.navigate which uses page.goto
-                pass
+        # Validate the URL before starting a browser, and report problems as a
+        # structured result rather than letting the exception reach the host.
+        if name == "browser_navigate":
+            if not str(args.get("url") or "").strip():
+                return _error(ErrorCode.INVALID_ARGS, "browser_navigate requires a url")
+            try:
+                self.check_url_allowed(str(args["url"]))
+            except PermissionError as exc:
+                return _error(ErrorCode.BLOCKED, str(exc))
+            except ValueError as exc:
+                return _error(ErrorCode.INVALID_ARGS, str(exc))
         try:
+            agent = await self.ensure_agent()
             result = await agent.call_tool(name, args)
             if not isinstance(result, dict):
                 return {"ok": True, "result": result}
             return result
         except PermissionError as exc:
-            return {
-                "ok": False,
-                "error_code": "blocked",
-                "error_message": str(exc),
-            }
+            return _error(ErrorCode.BLOCKED, str(exc))
         except Exception as exc:
-            return {
-                "ok": False,
-                "error_code": "unknown",
-                "error_message": f"{type(exc).__name__}: {exc}",
-            }
+            return _error(ErrorCode.UNKNOWN, f"{type(exc).__name__}: {exc}")
+
+
+def _error(code: ErrorCode, message: str) -> dict[str, Any]:
+    return {"ok": False, "error_code": code.value, "error_message": message}
+
+
+_DETAIL_LEVELS = tuple(level.value for level in DetailLevel)
+
+
+def _env_number(name: str, default: float, *, minimum: float = 0) -> float:
+    """Read a numeric env var, naming the variable if the value is unusable.
+
+    A bare int()/float() failure ("invalid literal for int()") gave no hint
+    which setting was wrong when the MCP server started.
+    """
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return float(default)
+    try:
+        value = float(raw)
+    except ValueError:
+        raise ValueError(f"{name} must be a number, got {raw!r}") from None
+    if value < minimum:
+        raise ValueError(f"{name} must be >= {minimum:g}, got {raw!r}")
+    return value
+
+
+def _normalize_host(entry: str) -> str:
+    """Reduce an allowlist entry to a bare lowercase hostname.
+
+    Accepts forms people naturally paste, e.g. ``https://GitHub.com/``,
+    ``github.com:443`` or ``.github.com``, which would otherwise never match.
+    """
+    value = entry.strip().lower()
+    if "://" in value:
+        value = urlparse(value).hostname or ""
+    value = value.split("/", 1)[0].split(":", 1)[0]
+    return value.strip(".")
 
 
 def _parse_allowlist(raw: str) -> list[str]:

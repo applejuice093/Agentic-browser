@@ -301,7 +301,7 @@ agent-browser scrape https://example.com -o data/out.json
 | `AGENT_BROWSER_MAX_TOKENS` | `2000` | Observation budget |
 | `AGENT_BROWSER_DETAIL` | `normal` | `sparse` \| `normal` \| `full` |
 | `AGENT_BROWSER_SETTLE_MS` | `8000` | SPA settle budget |
-| `AGENT_BROWSER_ALLOWED_HOSTS` | _(all)_ | Comma-separated allowlist |
+| `AGENT_BROWSER_ALLOWED_HOSTS` | _(all)_ | Comma-separated allowlist (http/https only when set; see [docs/mcp.md](docs/mcp.md)) |
 | `AGENT_BROWSER_DEFAULT_TIMEOUT_MS` | `30000` | Action timeout |
 | `TESSERACT_CMD` | — | OCR binary path (vision extra) |
 
