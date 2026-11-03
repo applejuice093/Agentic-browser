@@ -62,3 +62,15 @@ async def test_blocked_navigation_returns_structured_error():
     bad = await mgr.call_tool("browser_navigate", {"url": "not a url"})
     assert bad["error_code"] == "invalid_args"
     assert mgr._browser is None
+
+
+def test_allowlist_normalizes_entries_and_rejects_other_schemes():
+    mgr = McpSessionManager(allowed_hosts=["https://GitHub.com/", "example.org:443", ".docs.rs"])
+    assert mgr.allowed_hosts == ["github.com", "example.org", "docs.rs"]
+    mgr.check_url_allowed("https://github.com./vercel")
+    mgr.check_url_allowed("http://www.example.org/page")
+    mgr.check_url_allowed("https://docs.rs/tokio")
+    with pytest.raises(PermissionError):
+        mgr.check_url_allowed("file://github.com/etc/passwd")
+    with pytest.raises(PermissionError):
+        mgr.check_url_allowed("https://github.com.evil.example/")

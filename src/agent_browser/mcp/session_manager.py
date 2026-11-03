@@ -44,7 +44,7 @@ class McpSessionManager:
         allow = allowed_hosts or _parse_allowlist(
             os.environ.get("AGENT_BROWSER_ALLOWED_HOSTS", "")
         )
-        self.allowed_hosts = [h.lower().lstrip(".") for h in allow if h]
+        self.allowed_hosts = [h for h in (_normalize_host(a) for a in allow) if h]
 
         self._browser: Browser | None = None
         self._agent: AgentSession | None = None
@@ -89,14 +89,24 @@ class McpSessionManager:
         return self._agent
 
     def check_url_allowed(self, url: str) -> None:
+        """Raise unless ``url`` is an http(s) URL on an allowed host.
+
+        With an allowlist set, other schemes are refused too: otherwise
+        ``file://github.com/etc/passwd`` would pass the host check.
+        """
         if not self.allowed_hosts:
             return
         try:
-            host = (urlparse(url).hostname or "").lower()
+            parsed = urlparse(url)
+            host = (parsed.hostname or "").lower().rstrip(".")
         except Exception as exc:
             raise ValueError(f"invalid url: {url}") from exc
         if not host:
             raise ValueError(f"invalid url host: {url}")
+        if parsed.scheme.lower() not in ("http", "https"):
+            raise PermissionError(
+                f"scheme {parsed.scheme!r} not allowed while AGENT_BROWSER_ALLOWED_HOSTS is set"
+            )
         for allowed in self.allowed_hosts:
             if host == allowed or host.endswith("." + allowed):
                 return
@@ -131,6 +141,19 @@ class McpSessionManager:
 
 def _error(code: ErrorCode, message: str) -> dict[str, Any]:
     return {"ok": False, "error_code": code.value, "error_message": message}
+
+
+def _normalize_host(entry: str) -> str:
+    """Reduce an allowlist entry to a bare lowercase hostname.
+
+    Accepts forms people naturally paste, e.g. ``https://GitHub.com/``,
+    ``github.com:443`` or ``.github.com``, which would otherwise never match.
+    """
+    value = entry.strip().lower()
+    if "://" in value:
+        value = urlparse(value).hostname or ""
+    value = value.split("/", 1)[0].split(":", 1)[0]
+    return value.strip(".")
 
 
 def _parse_allowlist(raw: str) -> list[str]:
