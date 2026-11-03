@@ -39,7 +39,7 @@ test:
 	$(PYTEST) -q
 
 test-unit:
-	$(PYTEST) -q tests/test_config.py tests/test_exceptions.py tests/test_observation_compact.py tests/test_stable_ids.py tests/test_models.py
+	$(PYTEST) -q tests/test_config.py tests/test_exceptions.py tests/test_observation_compact.py tests/test_stable_ids.py tests/test_models.py tests/test_memory_store.py tests/test_scrape.py tests/test_cli.py
 
 lint:
 	$(RUFF) check src tests examples
