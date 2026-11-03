@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — 2026-11-03 hardening
+
+### Fixes
+
+- MCP server starts with `mcp` 2.x (`MCPServer`), still falls back to 1.x `FastMCP`
+- MCP: blocked or malformed `browser_navigate` URLs return `blocked` / `invalid_args`
+  results instead of raising, and no browser is launched for them
+- MCP allowlist: only http(s) when set; entries like `https://github.com/` or
+  `github.com:443` are normalised; trailing-dot hosts match
+- MCP env settings (`MAX_TOKENS`, `SETTLE_MS`, `DETAIL`) validated with clear errors
+- `MemoryStore`: SQLite connections are closed; reopening a session restores
+  actions, URLs and forms; non-JSON values (datetime, Path) no longer crash
+- `HumanizedInput`: inverted ranges rejected; click points stay inside tiny boxes
+- `BrowserConfig`: humanize min delay may not exceed the max
+- Scrape: only `h1`-`h6` count as headings (not `<header>`, `<hr>`, `<html>`)
+- CLI: `--timeout` must be a non-negative integer; Ctrl+C exits 130 without a traceback
+- Install hints use the `agentic-browser` package name
+
+### Tests
+
+- New `test_memory_store.py` and `test_scrape.py`; MCP tool list checked against
+  `TOOL_DEFINITIONS`; allowlist, env, CLI timeout and humanize edge cases
+
 ## Unreleased — 2026-10-15 polish
 
 ### Docs & packaging
