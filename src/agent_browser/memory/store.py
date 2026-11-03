@@ -120,12 +120,15 @@ class MemoryStore:
         return value
 
     def set(self, key: str, value: Any) -> None:
+        # Serialise first so a non-JSON value can't leave memory and disk out
+        # of sync (previously the dict was updated before json.dumps raised).
+        encoded = json.dumps(value, default=str) if self._db_path else None
         self._kv[key] = value
         if self._db_path:
             with self._connect() as conn:
                 conn.execute(
                     "INSERT OR REPLACE INTO memory_kv(session_id, key, value, ts) VALUES (?,?,?,?)",
-                    (self.session_id, key, json.dumps(value), time.time()),
+                    (self.session_id, key, encoded, time.time()),
                 )
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -155,7 +158,7 @@ class MemoryStore:
             with self._connect() as conn:
                 conn.execute(
                     "INSERT INTO memory_actions(session_id, ts, action_json) VALUES (?,?,?)",
-                    (self.session_id, safe["timestamp"], json.dumps(safe)),
+                    (self.session_id, safe["timestamp"], json.dumps(safe, default=str)),
                 )
 
     def log_url(self, url: str) -> None:

@@ -40,3 +40,15 @@ def test_reopened_session_restores_history(tmp_path):
 
     other = MemoryStore("s2", db_path=db)
     assert other.actions() == [] and other.summary()["urls"] == []
+
+
+def test_non_json_values_are_persisted_as_text(tmp_path):
+    from datetime import datetime
+    from pathlib import Path
+
+    mem = MemoryStore("s1", db_path=tmp_path / "mem.db")
+    mem.set("when", datetime(2026, 1, 2, 3, 4, 5))
+    mem.log_action({"type": "upload", "path": Path("/tmp/file.txt")})
+    again = MemoryStore("s1", db_path=tmp_path / "mem.db")
+    assert again.get("when") == "2026-01-02 03:04:05"
+    assert again.actions()[0]["path"] == "/tmp/file.txt"
