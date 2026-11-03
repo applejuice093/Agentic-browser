@@ -59,3 +59,14 @@ def test_config_reads_env_prefix(monkeypatch):
     assert cfg.headless is False
     assert cfg.browser_type == "webkit"
     assert cfg.default_timeout_ms == 12_000
+
+
+def test_config_rejects_inverted_humanize_range():
+    with pytest.raises(ValidationError, match="humanize_min_delay_ms"):
+        BrowserConfig(humanize_min_delay_ms=200, humanize_max_delay_ms=50)
+
+
+def test_config_rejects_inverted_humanize_range_from_env(monkeypatch):
+    monkeypatch.setenv("AGENT_BROWSER_HUMANIZE_MIN_DELAY_MS", "500")
+    with pytest.raises(ValidationError):
+        BrowserConfig()

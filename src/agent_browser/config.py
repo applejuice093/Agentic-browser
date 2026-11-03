@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -70,3 +70,12 @@ class BrowserConfig(BaseSettings):
         ge=0,
         description="Maximum per-keystroke / micro-move delay when humanize is on.",
     )
+
+    @model_validator(mode="after")
+    def _check_humanize_range(self) -> BrowserConfig:
+        if self.humanize_min_delay_ms > self.humanize_max_delay_ms:
+            raise ValueError(
+                "humanize_min_delay_ms must not exceed humanize_max_delay_ms "
+                f"({self.humanize_min_delay_ms} > {self.humanize_max_delay_ms})"
+            )
+        return self
