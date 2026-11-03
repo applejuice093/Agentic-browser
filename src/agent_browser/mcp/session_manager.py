@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 from agent_browser.agent.session import AgentSession
 from agent_browser.browser import Browser
 from agent_browser.config import BrowserConfig
+from agent_browser.models.observation import ErrorCode
 
 
 class McpSessionManager:
@@ -105,35 +106,31 @@ class McpSessionManager:
 
     async def call_tool(self, name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
         args = dict(arguments or {})
-        if name in ("browser_navigate",) and "url" in args:
-            self.check_url_allowed(str(args["url"]))
-        agent = await self.ensure_agent()
-        # First navigation via open if agent page is blank
-        if name == "browser_navigate" and self._browser is not None:
-            url = str(args.get("url", ""))
-            if url and (
-                not agent.page.url
-                or agent.page.url in ("about:blank", "chrome://newtab/")
-            ):
-                # use agent.navigate which uses page.goto
-                pass
+        # Validate the URL before starting a browser, and report problems as a
+        # structured result rather than letting the exception reach the host.
+        if name == "browser_navigate":
+            if not str(args.get("url") or "").strip():
+                return _error(ErrorCode.INVALID_ARGS, "browser_navigate requires a url")
+            try:
+                self.check_url_allowed(str(args["url"]))
+            except PermissionError as exc:
+                return _error(ErrorCode.BLOCKED, str(exc))
+            except ValueError as exc:
+                return _error(ErrorCode.INVALID_ARGS, str(exc))
         try:
+            agent = await self.ensure_agent()
             result = await agent.call_tool(name, args)
             if not isinstance(result, dict):
                 return {"ok": True, "result": result}
             return result
         except PermissionError as exc:
-            return {
-                "ok": False,
-                "error_code": "blocked",
-                "error_message": str(exc),
-            }
+            return _error(ErrorCode.BLOCKED, str(exc))
         except Exception as exc:
-            return {
-                "ok": False,
-                "error_code": "unknown",
-                "error_message": f"{type(exc).__name__}: {exc}",
-            }
+            return _error(ErrorCode.UNKNOWN, f"{type(exc).__name__}: {exc}")
+
+
+def _error(code: ErrorCode, message: str) -> dict[str, Any]:
+    return {"ok": False, "error_code": code.value, "error_message": message}
 
 
 def _parse_allowlist(raw: str) -> list[str]:
