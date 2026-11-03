@@ -74,3 +74,17 @@ def test_allowlist_normalizes_entries_and_rejects_other_schemes():
         mgr.check_url_allowed("file://github.com/etc/passwd")
     with pytest.raises(PermissionError):
         mgr.check_url_allowed("https://github.com.evil.example/")
+
+
+def test_env_settings_are_validated_with_clear_errors(monkeypatch):
+    monkeypatch.setenv("AGENT_BROWSER_MAX_TOKENS", "lots")
+    with pytest.raises(ValueError, match="AGENT_BROWSER_MAX_TOKENS"):
+        McpSessionManager()
+    monkeypatch.setenv("AGENT_BROWSER_MAX_TOKENS", "1500")
+    monkeypatch.setenv("AGENT_BROWSER_DETAIL", "verbose")
+    with pytest.raises(ValueError, match="AGENT_BROWSER_DETAIL"):
+        McpSessionManager()
+    monkeypatch.setenv("AGENT_BROWSER_DETAIL", "Sparse")
+    monkeypatch.setenv("AGENT_BROWSER_HEADLESS", "on")
+    mgr = McpSessionManager()
+    assert (mgr.max_tokens, mgr.detail, mgr.headless) == (1500, "sparse", True)

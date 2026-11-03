@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 from agent_browser.agent.session import AgentSession
 from agent_browser.browser import Browser
 from agent_browser.config import BrowserConfig
-from agent_browser.models.observation import ErrorCode
+from agent_browser.models.observation import DetailLevel, ErrorCode
 
 
 class McpSessionManager:
@@ -30,17 +30,21 @@ class McpSessionManager:
         allowed_hosts: list[str] | None = None,
     ) -> None:
         if headless is None:
-            headless = os.environ.get("AGENT_BROWSER_HEADLESS", "true").lower() in (
+            headless = os.environ.get("AGENT_BROWSER_HEADLESS", "true").strip().lower() in (
                 "1",
                 "true",
                 "yes",
+                "on",
             )
         self.headless = headless
-        self.max_tokens = int(os.environ.get("AGENT_BROWSER_MAX_TOKENS", str(max_tokens)))
-        self.detail = os.environ.get("AGENT_BROWSER_DETAIL", detail)
-        self.settle_budget_ms = float(
-            os.environ.get("AGENT_BROWSER_SETTLE_MS", str(settle_budget_ms))
-        )
+        self.max_tokens = int(_env_number("AGENT_BROWSER_MAX_TOKENS", max_tokens, minimum=1))
+        self.detail = os.environ.get("AGENT_BROWSER_DETAIL", detail).strip().lower()
+        if self.detail not in _DETAIL_LEVELS:
+            raise ValueError(
+                f"AGENT_BROWSER_DETAIL must be one of {', '.join(_DETAIL_LEVELS)}, "
+                f"got {self.detail!r}"
+            )
+        self.settle_budget_ms = _env_number("AGENT_BROWSER_SETTLE_MS", settle_budget_ms)
         allow = allowed_hosts or _parse_allowlist(
             os.environ.get("AGENT_BROWSER_ALLOWED_HOSTS", "")
         )
@@ -141,6 +145,27 @@ class McpSessionManager:
 
 def _error(code: ErrorCode, message: str) -> dict[str, Any]:
     return {"ok": False, "error_code": code.value, "error_message": message}
+
+
+_DETAIL_LEVELS = tuple(level.value for level in DetailLevel)
+
+
+def _env_number(name: str, default: float, *, minimum: float = 0) -> float:
+    """Read a numeric env var, naming the variable if the value is unusable.
+
+    A bare int()/float() failure ("invalid literal for int()") gave no hint
+    which setting was wrong when the MCP server started.
+    """
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return float(default)
+    try:
+        value = float(raw)
+    except ValueError:
+        raise ValueError(f"{name} must be a number, got {raw!r}") from None
+    if value < minimum:
+        raise ValueError(f"{name} must be >= {minimum:g}, got {raw!r}")
+    return value
 
 
 def _normalize_host(entry: str) -> str:
